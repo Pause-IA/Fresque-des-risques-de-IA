@@ -109,6 +109,16 @@
       <button class="btn" id="btn-annuler" disabled title="Annuler ma dernière action (Ctrl+Z)" aria-keyshortcuts="Control+Z">Annuler</button>
       <button class="btn" id="btn-export" hidden title="Télécharger le tableau en image">Image ⬇</button>
       <button class="btn" id="btn-participants" title="Qui est connecté"><span aria-hidden="true">👥</span><span class="pa-txt">Participants</span> <b id="nb-part">0</b></button>
+      <!-- LEVER LA MAIN, SANS QUITTER LE TABLEAU. En visio, demander la parole
+           oblige a aller chercher la grille des visages : on perd ce qu'on
+           etait en train de faire, et personne ne sait qui a demande en
+           premier. Le bouton dit AUSSI son rang dans la file. -->
+      <button class="btn btn-main" id="btn-main" aria-pressed="false" title="Demander la parole (M)" aria-keyshortcuts="m">
+        <span class="main-ico" aria-hidden="true">✋</span><span class="main-txt">Lever la main</span><b class="main-rang" id="main-rang" hidden></b>
+      </button>
+      <button class="btn" id="btn-rail" aria-expanded="false" title="Conversation et mains levées (C)" aria-keyshortcuts="c">
+        <span aria-hidden="true">💬</span><span class="rail-txt">Conversation</span><b class="rail-pastille" id="rail-pastille" hidden>0</b>
+      </button>
       <button class="btn" id="btn-affichage" aria-haspopup="true" aria-expanded="false" title="Fond, curseurs, plein écran">Affichage</button>
       <div class="menu-aff" id="menu-affichage" hidden>
         <button class="btn tool" id="btn-sombre" aria-pressed="false">Fond noir</button>
@@ -154,6 +164,41 @@
       </div>
       <a class="vocal-lien" id="vocal-lien" href="#" target="_blank" rel="noopener" hidden>🎧 Rejoindre le salon vocal</a>
       <ul class="liste-part" id="liste-part"></ul>
+    </aside>
+
+    <!-- LA BARRE LATERALE : la file de parole et la conversation.
+         Deux choses que la visioconference fait mal quand on a le tableau sous
+         les yeux. On les a longtemps laissees dehors pour ne pas charger le
+         tableau de bord ; en atelier, c'est ce qui manquait le plus, parce que
+         basculer vers la visio fait perdre le fil de ce qu'on fait.
+         Les deux vivent dans la MEME colonne : qui demande la parole et ce qui
+         se dit, c'est la meme conversation. -->
+    <aside class="rail" id="rail" hidden aria-labelledby="rail-titre">
+      <div class="rail-tete">
+        <h3 id="rail-titre">Conversation</h3>
+        <button class="btn ico" id="rail-fermer" aria-label="Fermer la conversation">✕</button>
+      </div>
+
+      <section class="rail-mains" id="rail-mains">
+        <div class="rail-sous">
+          <h4 id="mains-titre">Mains levées <b class="mains-nb" id="mains-nb">0</b></h4>
+          <button class="btn mini anim-only" id="mains-vider" hidden>Tout baisser</button>
+        </div>
+        <ol class="mains-liste" id="mains-liste" aria-labelledby="mains-titre"></ol>
+        <p class="rail-vide" id="mains-vide">Personne ne demande la parole.</p>
+      </section>
+
+      <div class="rail-fil" id="chat-fil" role="log" aria-live="polite" aria-labelledby="rail-titre"></div>
+      <p class="rail-vide rail-vide-chat" id="chat-vide">Un mot à dire sans couper la parole&nbsp;? C'est ici.</p>
+
+      <form class="rail-ecrire" id="chat-form">
+        <label class="sr-only" for="chat-texte">Votre message</label>
+        <textarea id="chat-texte" rows="1" maxlength="240" placeholder="Écrire au groupe…" autocomplete="off"></textarea>
+        <button class="btn primaire ico" id="chat-envoyer" type="submit" aria-label="Envoyer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <p class="rail-etat" id="chat-etat" role="status" aria-live="polite"></p>
     </aside>
 
     <aside class="aide-pop" id="aide-pop" hidden aria-label="Aide">

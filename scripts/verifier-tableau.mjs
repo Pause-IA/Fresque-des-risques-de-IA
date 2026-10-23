@@ -104,6 +104,18 @@ const jP = R.rejoindre(S, "Bleu");
 
 const journal = [{ t: 0, s: JSON.parse(JSON.stringify(S)) }];
 const noter = () => journal.push({ t: Date.now(), s: JSON.parse(JSON.stringify(S)) });
+/* Le registre des battements, et son report sur une copie : exactement ce que
+   fait le service reel avant de projeter la vue. */
+const presence = {};
+function avecPresence(s) {
+  const marquer = (x) => {
+    const t = presence[x.id] || 0;
+    if (t > (x.vuLe || 0)) { x.vuLe = t; x.connecte = true; }
+  };
+  marquer(s.animateur);
+  s.participants.forEach(marquer);
+  return s;
+}
 function lirePerime() {
   const lim = Date.now() - RETARD;
   let out = journal[0].s;
@@ -119,12 +131,21 @@ async function servir(route) {
     const o = R.rejoindre(S, d.prenom, d.jeton);
     corps = o && o.refus ? { refus: o.refus } : { jeton: o.jeton, role: o.role, moi: o.id || null, etat: R.vue(S) };
   } else if (d.op === "etat") {
+    /* LA PRESENCE VIT A COTE, COMME EN PRODUCTION. Le vrai service tient les
+       battements dans leur propre magasin et les reporte sur la copie juste
+       avant de projeter la vue (voir presenceToucher dans
+       netlify/functions/fresque.js) : ecrire le document de session pour un
+       simple horodatage faisait reculer le tableau. Sans ce report ici, tout
+       le monde paraissait parti au bout de quinze secondes, et le harnais
+       accusait a tort le code qu'il teste. */
+    const info = S.jetons[d.jeton];
+    if (info) presence[info.role === "animateur" ? S.animateur.id : info.id] = Date.now();
     // Le faux service doit respecter le MEME contrat que le vrai : ne jamais
     // servir un etat plus ancien que celui que le client dit deja avoir. Sans
     // cela on fabrique ici une situation qui n'existe pas en production (un
     // serveur qui fait reculer ses clients en boucle), et le harnais echoue au
     // hasard sur des mesures parfaitement justes.
-    const vu = R.vue(lirePerime());
+    const vu = R.vue(avecPresence(lirePerime()));
     const connue = Math.max(0, +d.version || 0);
     corps = (connue && vu.version < connue) ? { inchange: true, version: connue } : { etat: vu };
   } else if (d.op === "agir") {
@@ -1245,6 +1266,144 @@ await bloc("Tactile et export", async () => {
     }
   }
   await ctxT.close();
+});
+
+/* ========================================================================== */
+/* FILE DE PAROLE ET CONVERSATION.
+   Deux fonctions ajoutees parce que basculer vers la visioconference pour
+   demander la parole fait perdre ce qu'on est en train de faire. Ce qui peut
+   casser en silence, et que seul un vrai navigateur montre :
+   - l'ordre de la file differe selon qui regarde (chacun trie sur SON horloge)
+     alors que c'est exactement ce qu'on vient chercher ;
+   - lever la main deux fois, ou un renvoi apres coupure, renvoie en fin de
+     file : on perd sa place sans comprendre pourquoi ;
+   - le message met l'aller-retour du serveur a s'afficher (ici 1,9 s) et l'on
+     croit l'avoir rate, donc on le retape ;
+   - un message arrive barre fermee sans que rien ne le signale. */
+console.log("\n--- File de parole et conversation ---");
+await bloc("Mains levees et conversation", async () => {
+  const C = await ouvrir("participant 2", R.rejoindre(S, "Vert").jeton, "participant");
+  await dodo(RETARD + 700);
+
+  const ouvrirRail = (p) => p.evaluate(() => {
+    const b = document.getElementById("btn-rail");
+    if (b && document.getElementById("rail").hidden) b.click();
+  });
+  const file = (p) => p.evaluate(() => [...document.querySelectorAll("#mains-liste li")]
+    .map((li) => li.querySelector(".main-nom").textContent.trim()));
+
+  await ouvrirRail(A); await ouvrirRail(B); await ouvrirRail(C);
+
+  /* L'ORDRE EST CELUI DES DEMANDES, et il doit etre le meme partout. On leve
+     la main sur deux postes a 150 ms d'intervalle : des horloges de clients
+     suffiraient a les inverser quelque part. */
+  await C.evaluate(() => document.getElementById("btn-main").click());
+  await dodo(150);
+  await B.evaluate(() => document.getElementById("btn-main").click());
+  await dodo(LATENCE_ECRIT + 1200);
+  const fA = await file(A), fB = await file(B), fC = await file(C);
+  t("la file est dans l'ordre des demandes", fC.join(",") === "Vert,Bleu", fC.join(","));
+  t("et tout le monde voit le meme ordre",
+    fA.join(",") === fC.join(",") && fB.join(",") === fC.join(","),
+    "anim=" + fA.join(",") + " | bleu=" + fB.join(",") + " | vert=" + fC.join(","));
+
+  /* LA MAIN SE VOIT TOUT DE SUITE chez soi : sinon on la releve. */
+  const vuMain = await B.evaluate(async () => {
+    const t0 = performance.now();
+    document.getElementById("btn-main").click();         // baisse
+    document.getElementById("btn-main").click();         // releve
+    for (let i = 0; i < 200; i++) {
+      if (document.getElementById("btn-main").getAttribute("aria-pressed") === "true") return performance.now() - t0;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    return -1;
+  });
+  t("sa propre main se leve sans attendre le serveur", vuMain >= 0 && vuMain < 300,
+    Math.round(vuMain) + " ms");
+  await dodo(LATENCE_ECRIT + 1400);
+
+  /* LEVER DEUX FOIS NE COUTE PAS SA PLACE : un double-clic arrive tout le
+     temps, et un renvoi apres coupure reseau aussi. */
+  const avant = await file(C);
+  await C.evaluate(() => { const b = document.getElementById("btn-main"); b.click(); b.click(); });
+  await dodo(LATENCE_ECRIT + 1400);
+  t("lever la main deux fois ne renvoie pas en fin de file",
+    (await file(C)).join(",") === avant.join(","), "avant " + avant.join(",") + " apres " + (await file(C)).join(","));
+
+  /* L'ANIMATEUR·ICE DONNE LA PAROLE : la file avance pour tout le monde. */
+  const premier = (await file(A))[0];
+  await A.evaluate(() => {
+    const li = document.querySelector("#mains-liste li");
+    const b = li && li.querySelector(".main-x");
+    if (b) b.click();
+  });
+  await dodo(LATENCE_ECRIT + 1400);
+  const apres = await file(B);
+  t("l'animateur·ice fait avancer la file", apres.indexOf(premier) === -1,
+    "premier=" + premier + " reste=" + apres.join(","));
+
+  /* LE MESSAGE S'AFFICHE TOUT DE SUITE chez soi, et vite chez les autres. */
+  const vuMoi = await B.evaluate(async () => {
+    const t0 = performance.now();
+    const c = document.getElementById("chat-texte");
+    c.value = "on peut couper le lot 3 ?";
+    document.getElementById("chat-form").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    for (let i = 0; i < 200; i++) {
+      if (/lot 3/.test(document.getElementById("chat-fil").textContent || "")) return performance.now() - t0;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    return -1;
+  });
+  t("son propre message s'affiche sans attendre le serveur", vuMoi >= 0 && vuMoi < 300,
+    Math.round(vuMoi) + " ms");
+  await dodo(LATENCE_ECRIT + 1600);
+  t("et il arrive chez les autres",
+    await A.evaluate(() => /lot 3/.test(document.getElementById("chat-fil").textContent || "")));
+  t("une seule fois, pas deux",
+    (await A.evaluate(() => document.querySelectorAll("#chat-fil .msg").length)) === 1,
+    String(await A.evaluate(() => document.querySelectorAll("#chat-fil .msg").length)));
+  t("avec le nom de qui l'a ecrit",
+    await A.evaluate(() => /Bleu/.test(document.querySelector("#chat-fil .msg-qui").textContent || "")));
+
+  /* UN MESSAGE RECU BARRE FERMEE DOIT SE SIGNALER, sinon la conversation ne
+     sert a rien : on ne regarde pas une barre fermee. */
+  await C.evaluate(() => document.getElementById("rail-fermer").click());
+  await dodo(300);
+  await B.evaluate(() => {
+    document.getElementById("chat-texte").value = "je dois partir a 17 h";
+    document.getElementById("chat-form").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  });
+  await dodo(LATENCE_ECRIT + 1800);
+  const pastille = await C.evaluate(() => {
+    const b = document.getElementById("rail-pastille");
+    return { vu: !b.hidden, n: b.textContent };
+  });
+  t("un message recu barre fermee allume une pastille", pastille.vu, JSON.stringify(pastille));
+  await C.evaluate(() => document.getElementById("btn-rail").click());
+  await dodo(400);
+  t("et la pastille s'eteint quand on ouvre",
+    await C.evaluate(() => document.getElementById("rail-pastille").hidden));
+
+  /* ON NE TAPE PAS « m » DANS LA CONVERSATION POUR LEVER LA MAIN. */
+  const avantM = await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"));
+  await C.evaluate(() => document.getElementById("chat-texte").focus());
+  await C.keyboard.type("comment");
+  await dodo(400);
+  t("ecrire « comment » ne leve pas la main",
+    (await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"))) === avantM
+    && (await C.evaluate(() => document.getElementById("chat-texte").value)) === "comment");
+
+  /* LA BARRE NE COUVRE PAS LE TABLEAU AU POINT DE LE RENDRE INUTILISABLE :
+     elle est en surcouche, le tableau garde sa taille. */
+  const place = await C.evaluate(() => {
+    const r = document.getElementById("rail").getBoundingClientRect();
+    const s = document.getElementById("scene").getBoundingClientRect();
+    return { large: r.width, scene: s.width, dedans: r.right <= s.right + 1 && r.top >= s.top - 1 };
+  });
+  t("la barre tient dans la scene sans la retailler", place.dedans && place.large > 200,
+    JSON.stringify(place));
+
+  await C.context().close();
 });
 
 /* ========================================================================== */

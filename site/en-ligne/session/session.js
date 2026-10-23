@@ -77,6 +77,16 @@
     titresOn: "Titles when zoomed out: shown", titresOff: "Titles when zoomed out: hidden",
     relaisAncien: "Live sharing is running in reduced mode (the relay needs updating).",
     flecheEchap: "Click the target card (Esc cancels).",
+    leverMain: "Raise hand", baisserMain: "Lower hand",
+    mainLevee: function (r) { return "Your hand is up, you are number " + r + "."; },
+    mainBaissee: "Your hand is down.",
+    personneMain: "Nobody is asking to speak.",
+    donnerParole: "Done", donnerParoleAide: "Lower this hand (they have spoken)",
+    chatVide: "Something to say without interrupting? Here.",
+    chatEcrire: "Write to the group…", chatEnvoyer: "Send",
+    chatTropVite: "Easy there: wait a few seconds.",
+    conversation: "Chat", mainsTitre: "Raised hands", toutBaisser: "Lower all",
+    chatEchec: "Message not sent. It stays in the box, try again.",
     coachRelier: "To connect two cards: pick the “Link →” tool, then click one card and another."
   } : {
     prenomManquant: "Indiquez votre prénom.", creation: "Création…", echec: "Échec.",
@@ -146,6 +156,16 @@
     titresOn: "Titres au dézoom : affichés", titresOff: "Titres au dézoom : masqués",
     relaisAncien: "Partage en direct en mode réduit (le relais doit être mis à jour).",
     flecheEchap: "Cliquez la carte d'arrivée (Échap annule).",
+    leverMain: "Lever la main", baisserMain: "Baisser la main",
+    mainLevee: function (r) { return "Votre main est levée, vous êtes " + (r === 1 ? "le ou la premier·e" : "en " + r + "e position") + "."; },
+    mainBaissee: "Votre main est baissée.",
+    personneMain: "Personne ne demande la parole.",
+    donnerParole: "A parlé", donnerParoleAide: "Baisser cette main (la personne a parlé)",
+    chatVide: "Un mot à dire sans couper la parole ? C'est ici.",
+    chatEcrire: "Écrire au groupe…", chatEnvoyer: "Envoyer",
+    chatTropVite: "Doucement : attendez quelques secondes.",
+    conversation: "Conversation", mainsTitre: "Mains levées", toutBaisser: "Tout baisser",
+    chatEchec: "Message non envoyé. Il reste dans la boîte, réessayez.",
     coachRelier: "Pour relier deux cartes : outil « Lien → », puis cliquez une carte et une autre."
   };
 
@@ -181,7 +201,11 @@
       "#ma-libelle": "Your session link:",
       "#ma-copier": "Copy the link", "#ma-mail": "E-mail it to myself",
       ".mobile-avis .ma-fine:nth-of-type(1)": "Then open it on your computer: the session opens on its own, with nothing to type.",
-      "#ma-forcer": "Continue on this screen anyway"
+      "#ma-forcer": "Continue on this screen anyway",
+      "#rail-titre": "Chat", "#mains-titre": "Raised hands", "#mains-vider": "Lower all",
+      "#mains-vide": "Nobody is asking to speak.",
+      "#chat-vide": "Something to say without interrupting? Here.",
+      ".main-txt": "Raise hand", ".rail-txt": "Chat"
     };
     Object.keys(txt).forEach(function (sel) { var el = document.querySelector(sel); if (el) el.textContent = txt[sel]; });
     var attr = [
@@ -189,6 +213,9 @@
       ["#btn-rassembler", "title", "Invite everyone to come and see what you see"],
       ["#z-moins", "aria-label", "Zoom out"], ["#z-plus", "aria-label", "Zoom in"],
       ["#fermer-panneau", "aria-label", "Close"], ["#modal-close", "aria-label", "Close"],
+      ["#rail-fermer", "aria-label", "Close the chat"], ["#chat-texte", "placeholder", "Write to the group…"],
+      ["#chat-envoyer", "aria-label", "Send"], ["#btn-main", "title", "Ask to speak (M)"],
+      ["#btn-rail", "title", "Chat and raised hands (C)"],
       ["#anim-prenom", "placeholder", "First name"], ["#join-prenom", "placeholder", "First name"],
       ['.tool[data-outil="deplacer"]', "title", "Hand: move and pan the board"], ['.tool[data-outil="deplacer"]', "aria-label", "Hand: move and pan the board"],
       ['.tool[data-outil="fleche"]', "title", "Link: click the source card, then the target"], ['.tool[data-outil="fleche"]', "aria-label", "Link two cards"],
@@ -252,7 +279,10 @@
    "btn-participants","panneau","fermer-panneau",
    "btn-barres","btn-barres-show","btn-affichage","menu-affichage","dock","zone-outils","grp-zoom","btn-annuler","btn-rassembler",
    "liste-part","vocal-url","btn-vocal","vocal-lien","visio-top","modal","carte-grande","modal-flip",
-   "modal-close","mg-img","mg-num","mg-tit","mg-vtit","mg-verso","mg-vimg"].forEach(function (id) {
+   "modal-close","mg-img","mg-num","mg-tit","mg-vtit","mg-verso","mg-vimg",
+   "rail","rail-fermer","btn-rail","rail-pastille","btn-main","main-rang",
+   "mains-liste","mains-nb","mains-vide","mains-vider",
+   "chat-fil","chat-vide","chat-form","chat-texte","chat-etat"].forEach(function (id) {
     E[id] = document.getElementById(id);
   });
   traduireStatique();
@@ -355,15 +385,33 @@
     }).catch(function () { E["btn-rejoindre"].disabled = false; lobbyMsg(S.indispo, "err"); });
   }
 
-  // reprise auto si ?s=CODE et jeton stocké
+  /* UN LIEN, UNE SEULE ENTREE.
+     Le lien d'invitation (?s=CODE) designe une session qui EXISTE. La page
+     offrait pourtant les deux colonnes : « Ouvrir une session » a cote de
+     « Rejoindre ». Cliquer la premiere ouvrait une AUTRE session, vide, avec
+     un autre code, pendant que le groupe attendait dans la bonne. C'est ce
+     qu'on nous a signale plusieurs fois, et c'est ce que fait n'importe qui
+     tombant sur deux boutons dont un dit « Ouvrir ».
+     Depuis un lien d'invitation, il n'y a donc qu'une entree : rejoindre.
+     Sauf pour l'animateur·ice qui a ouvert cette session-la : pour elle ou
+     lui, la seule entree est de la ROUVRIR, avec le meme code. */
   (function () {
     var m = new URLSearchParams(location.search).get("s");
-    if (m) { m = m.toUpperCase(); E["join-code"].value = m;
-      var j = jetonTab(m) || jetonAnim(m); // reprise (participant ou animateur)
-      if (j) api("rejoindre", { code: m, jeton: j }).then(function (res) {
-        if (res.d && res.d.jeton) { memoriser(m, res.d.jeton, res.d.role); demarrer(m, res.d.jeton, res.d.role, res.d.etat, res.d.moi); }
-      }).catch(function(){});
+    if (!m) return;
+    m = m.toUpperCase();
+    E["join-code"].value = m;
+    var estAnim = !!jetonAnim(m);
+    if (estAnim) {
+      lobbyRole("animateur");
+      codeSouhaite = m;                       // rouvrir CETTE session, pas une autre
+      if (E["anim-code"]) E["anim-code"].value = m;
+    } else {
+      lobbyRole("participant");
     }
+    var j = jetonTab(m) || jetonAnim(m); // reprise (participant ou animateur)
+    if (j) api("rejoindre", { code: m, jeton: j }).then(function (res) {
+      if (res.d && res.d.jeton) { memoriser(m, res.d.jeton, res.d.role); demarrer(m, res.d.jeton, res.d.role, res.d.etat, res.d.moi); }
+    }).catch(function(){});
   })();
 
   // Liens des e-mails : ?ouvrir=CODE (animateur, ouvre/reprend l'atelier reserve),
@@ -407,6 +455,18 @@
     }
     lobbyMsg(S.ouvrirAtelier(o));
     try { E["anim-prenom"].focus(); } catch (e) {}
+  })();
+  /* SANS AUCUN CODE DANS L'ADRESSE, il n'y a rien a rejoindre : la colonne
+     « Rejoindre » n'etait plus qu'un titre et une phrase d'explication, a
+     cote d'un formulaire utilisable. Deux colonnes pour une seule entree :
+     on garde l'explication, on retire la colonne. */
+  (function () {
+    if (document.body.classList.contains("lobby-solo")) return;
+    if (((E["join-code"] && E["join-code"].value) || "").length === 6) return;
+    lobbyRole("animateur");
+    var note = document.getElementById("note-sans-lien");
+    var premiere = document.querySelector("#lobby .lobby-cols > section");
+    if (note && premiere) premiere.appendChild(note);  // l'explication reste lisible
   })();
   majColonneRejoindre();
 
@@ -584,6 +644,8 @@
     rendrePool(vue);
     rendreDeck(vue);
     rendreVocal(vue);
+    rendreMains(vue);
+    rendreChat(vue);
     rendreTableau(vue.tableau);
     rendrePing(vue.ping);
     majCoach();
@@ -901,6 +963,172 @@
   }
 
   var _poolVues = {};   // cartes deja presentes au rendu precedent
+  /* ---------- FILE DE PAROLE ET CONVERSATION -------------------------------
+     POURQUOI ICI ET PAS DANS LA VISIO. Demander la parole en visioconference
+     oblige a quitter le tableau pour la grille des visages : on perd ce qu'on
+     etait en train de faire, et personne ne sait qui a demande en premier. De
+     meme pour une phrase a dire sans couper la parole. Les deux vivent donc a
+     cote du tableau, dans la meme colonne.
+
+     L'ORDRE VIENT DU SERVEUR, jamais de l'horloge d'un navigateur : deux
+     personnes qui levent la main a la meme seconde doivent apparaitre dans le
+     meme ordre pour tout le monde (voir serveur/src/regles.js). */
+  var rail = { ouvert: false, luJusqu: 0, nonLus: 0, sigMains: "", sigChat: "", envoiEnCours: 0 };
+
+  function monId() { return etat.role === "animateur" ? ((etat.vue && etat.vue.animateur && etat.vue.animateur.id) || "a1") : _idMoi; }
+  function maMain(vue) {
+    var id = monId();
+    var l = (vue && vue.mains) || [];
+    for (var i = 0; i < l.length; i++) { if (l[i].id === id) return i + 1; }
+    return 0;
+  }
+
+  function rendreMains(vue) {
+    var mains = (vue && vue.mains) || [];
+    var sig = mains.map(function (m) { return m.id + ":" + m.prenom + ":" + (m.absent ? 1 : 0); }).join(",") + "|" + etat.role;
+    if (sig === rail.sigMains) return; rail.sigMains = sig;
+
+    var ol = E["mains-liste"]; if (!ol) return;
+    ol.innerHTML = "";
+    var moi = monId(), jeSuisAnim = etat.role === "animateur";
+    mains.forEach(function (m, i) {
+      var li = document.createElement("li");
+      li.className = (i === 0 ? "premier" : "") + (m.id === moi ? " moi" : "")
+        + (m.absent ? " absent" : "");
+      /* LE RANG EST UN CHIFFRE. Dans une liste, il faut compter pour savoir
+         qui est troisieme ; ici on le lit. */
+      li.innerHTML = '<span class="main-rang-pastille" aria-hidden="true">' + (i + 1) + '</span>'
+        + '<span class="main-nom">' + esc(m.prenom) + '</span>'
+        /* Une main levee par quelqu'un dont l'onglet s'est ferme reste a sa
+           place : on la signale plutot que de la faire disparaitre, et
+           l'animateur·ice la baisse si besoin. */
+        + (m.absent ? '<span class="main-absent">' + esc(S.horsLigne) + '</span>' : '');
+      /* Chacun·e baisse la sienne ; l'animateur·ice baisse celle de qui vient
+         de parler, ce qui fait avancer la file. */
+      if (jeSuisAnim || m.id === moi) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "main-x";
+        b.textContent = m.id === moi ? S.baisserMain : S.donnerParole;
+        b.title = m.id === moi ? S.baisserMain : S.donnerParoleAide;
+        b.addEventListener("click", function () {
+          if (m.id === moi) agir({ op: "baisserMain" }, null, true);
+          else agir({ op: "baisserMainDe", id: m.id }, null, true);
+        });
+        li.appendChild(b);
+      }
+      ol.appendChild(li);
+    });
+    if (E["mains-vide"]) E["mains-vide"].hidden = mains.length > 0;
+    if (E["mains-nb"]) {
+      E["mains-nb"].textContent = mains.length;
+      E["mains-nb"].classList.toggle("a-du-monde", mains.length > 0);
+    }
+    if (E["mains-vider"]) E["mains-vider"].hidden = !(etat.role === "animateur" && mains.length > 0);
+
+    var rang = maMain(vue);
+    if (E["btn-main"]) {
+      E["btn-main"].setAttribute("aria-pressed", rang ? "true" : "false");
+      var txt = E["btn-main"].querySelector(".main-txt");
+      if (txt) txt.textContent = rang ? S.baisserMain : S.leverMain;
+    }
+    if (E["main-rang"]) {
+      E["main-rang"].hidden = !rang;
+      E["main-rang"].textContent = rang || "";
+    }
+  }
+
+  function heure(ts) {
+    try { return new Date(ts).toLocaleTimeString(EN ? "en-GB" : "fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+    catch (e) { return ""; }
+  }
+
+  function rendreChat(vue) {
+    var fil = (vue && vue.chat) || [];
+    var sig = fil.map(function (m) { return m.id; }).join(",");
+    var hote = E["chat-fil"]; if (!hote) return;
+    if (sig !== rail.sigChat) {
+      rail.sigChat = sig;
+      /* On ne reconstruit qu'au changement, et on garde le defilement en bas :
+         un fil qui remonte tout seul pendant qu'on lit est insupportable. */
+      var enBas = hote.scrollHeight - hote.scrollTop - hote.clientHeight < 40;
+      hote.innerHTML = "";
+      var moi = monId(), precedent = null;
+      fil.forEach(function (m) {
+        var d = document.createElement("div");
+        d.className = "msg" + (m.par === moi ? " moi" : "")
+          + (precedent === m.par ? " suite" : "")
+          + (String(m.id).charAt(0) === "~" ? " envoi" : "");
+        d.innerHTML = '<p class="msg-tete"><span class="msg-qui">' + esc(m.prenom)
+          + '</span><span>' + esc(heure(m.ts)) + '</span></p>'
+          + '<p class="msg-corps">' + esc(m.texte) + '</p>';
+        hote.appendChild(d);
+        precedent = m.par;
+      });
+      if (E["chat-vide"]) E["chat-vide"].hidden = fil.length > 0;
+      if (enBas || !fil.length) hote.scrollTop = hote.scrollHeight;
+    }
+    /* LES NON-LUS. Sans eux, un message passe inapercu quand la barre est
+       fermee, et la conversation ne sert a rien. On ne compte pas les siens. */
+    var moi2 = monId();
+    var nouveaux = fil.filter(function (m) { return m.ts > rail.luJusqu && m.par !== moi2; });
+    if (rail.ouvert) {
+      rail.luJusqu = Date.now();
+      rail.nonLus = 0;
+    } else if (nouveaux.length !== rail.nonLus) {
+      rail.nonLus = nouveaux.length;
+      if (nouveaux.length) flash(nouveaux[nouveaux.length - 1].prenom + " : " + nouveaux[nouveaux.length - 1].texte.slice(0, 60));
+    }
+    if (E["rail-pastille"]) {
+      E["rail-pastille"].hidden = !rail.nonLus;
+      E["rail-pastille"].textContent = rail.nonLus > 99 ? "99+" : rail.nonLus;
+    }
+  }
+
+  function ouvrirRail(oui) {
+    rail.ouvert = !!oui;
+    if (E.rail) E.rail.hidden = !rail.ouvert;
+    if (E["btn-rail"]) E["btn-rail"].setAttribute("aria-expanded", rail.ouvert ? "true" : "false");
+    if (rail.ouvert) {
+      rail.luJusqu = Date.now(); rail.nonLus = 0;
+      if (E["rail-pastille"]) E["rail-pastille"].hidden = true;
+      var f = E["chat-fil"]; if (f) f.scrollTop = f.scrollHeight;
+      if (E["chat-texte"]) E["chat-texte"].focus();
+    }
+    try { localStorage.setItem("rail-ouvert", rail.ouvert ? "1" : "0"); } catch (e) {}
+  }
+
+  function basculerMain() {
+    var rang = maMain(etat.vue);
+    agir({ op: rang ? "baisserMain" : "leverMain" }, null, true);
+    flash(rang ? S.mainBaissee : S.mainLevee(((etat.vue && etat.vue.mains) || []).length + 1));
+  }
+
+  function envoyerMessage() {
+    var champ = E["chat-texte"]; if (!champ) return;
+    var texte = champ.value.trim();
+    if (!texte) return;
+    if (E["chat-etat"]) E["chat-etat"].textContent = "";
+    /* LE CHAMP NE SE VIDE QU'A L'ENVOI REUSSI... non : il se vide tout de
+       suite, parce qu'on enchaine, et le texte revient dans la boite si le
+       serveur refuse. Perdre une phrase qu'on vient de taper est pire que la
+       voir revenir. */
+    champ.value = ""; tailleChamp();
+    agir({ op: "envoyerMessage", texte: texte }, function (rep) {
+      if (rep && rep.refus) {
+        if (E["chat-etat"]) E["chat-etat"].textContent = rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec);
+        if (!champ.value) { champ.value = texte; tailleChamp(); }
+      }
+    }, true);
+  }
+
+  // Le champ grandit avec le message, dans la limite fixee par la feuille de
+  // style : trois lignes tapees dans une case d'une ligne, on ne se relit pas.
+  function tailleChamp() {
+    var c = E["chat-texte"]; if (!c) return;
+    c.style.height = "auto";
+    c.style.height = Math.min(96, c.scrollHeight) + "px";
+  }
+
   function rendrePool(vue) {
     var z = E["pool"]; if (!z) return;
     var pool = vue.pool || [];
@@ -2211,7 +2439,49 @@
         var tt = tab.textes.filter(function (x) { return x.id === d.id; })[0];
         if (!tt) return false; tt.taille = borneTaille(d.taille); break;
       }
+      /* LA MAIN ET LE MESSAGE S'AFFICHENT TOUT DE SUITE. L'aller-retour avec
+         le serveur se compte en secondes : une main qui met deux secondes a
+         se lever, on la releve ; un message qui met deux secondes a
+         apparaitre, on le retape. */
+      case "leverMain": {
+        if (!v.mains) v.mains = [];
+        var idM = monId();
+        if (!v.mains.some(function (m) { return m.id === idM; })) {
+          v.mains.push({ id: idM, prenom: nomMoi(), ts: Date.now() });
+        }
+        break;
+      }
+      case "baisserMain": {
+        var idB = monId();
+        v.mains = (v.mains || []).filter(function (m) { return m.id !== idB; });
+        break;
+      }
+      case "baisserMainDe":
+        v.mains = (v.mains || []).filter(function (m) { return m.id !== d.id; });
+        break;
+      case "viderMains": v.mains = []; break;
+      case "envoyerMessage": {
+        if (!v.chat) v.chat = [];
+        var idC = monId(), txtC = String(d.texte == null ? "" : d.texte).slice(0, 240).trim();
+        if (!txtC) return false;
+        /* ON NE L'AFFICHE PAS DEUX FOIS. Entre l'etat du serveur recu par le
+           relais et notre propre reponse, le message existe des deux cotes :
+           le rejeu des actions en vol le reposerait. */
+        var deja = v.chat.some(function (m) {
+          return m.par === idC && m.texte === txtC && Date.now() - m.ts < 20000;
+        });
+        if (!deja) v.chat.push({ id: "~" + (++seqProv), par: idC, prenom: nomMoi(), texte: txtC, ts: Date.now() });
+        break;
+      }
       default: return false; // rien de visible a anticiper
+    }
+    /* Les mains et le fil ont leur propre rendu : ils ne touchent ni au
+       tableau, ni a la reserve, et les redessiner pour un message serait
+       refaire soixante-cinq fleches a chaque phrase. */
+    if (d.op === "leverMain" || d.op === "baisserMain" || d.op === "baisserMainDe"
+      || d.op === "viderMains" || d.op === "envoyerMessage") {
+      if (!muet) { rendreMains(v); rendreChat(v); }
+      return true;
     }
     if (!muet) { rendrePool(v); rendreDeck(v); rendreTableau(tab); }
     return true;
@@ -3251,7 +3521,22 @@
       if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.getAttribute("contenteditable") === "true")) return;
       e.preventDefault(); annulerDerniere(); return;
     }
+    var dansSaisie = (function () {
+      var a = document.activeElement;
+      return !!a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
+        || a.getAttribute("contenteditable") === "true");
+    })();
+    /* DEUX RACCOURCIS POUR CE QU'ON FAIT LE PLUS SOUVENT : demander la parole,
+       et ouvrir la conversation. Jamais pendant une saisie, sinon ecrire
+       « comment » leve la main deux fois. */
+    if (!dansSaisie && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "m" || e.key === "M") { e.preventDefault(); basculerMain(); return; }
+      if (e.key === "c" || e.key === "C") { e.preventDefault(); ouvrirRail(!rail.ouvert); return; }
+    }
     if (e.key !== "Escape") return;
+    if (rail.ouvert && dansSaisie && document.activeElement === E["chat-texte"]) {
+      E["chat-texte"].blur(); return;
+    }
     if (etat.flecheDepart) { annulerFleche(); setOutil("deplacer"); }
     else deselect();
   });
@@ -3434,6 +3719,27 @@
     });
   }
   if (E["btn-rassembler"]) E["btn-rassembler"].addEventListener("click", envoyerAppelVue);
+  /* ---------- Barre laterale : file de parole et conversation ------------ */
+  if (E["btn-rail"]) E["btn-rail"].addEventListener("click", function () { ouvrirRail(!rail.ouvert); });
+  if (E["rail-fermer"]) E["rail-fermer"].addEventListener("click", function () { ouvrirRail(false); });
+  if (E["btn-main"]) E["btn-main"].addEventListener("click", basculerMain);
+  if (E["mains-vider"]) E["mains-vider"].addEventListener("click", function () { agir({ op: "viderMains" }, null, true); });
+  if (E["chat-form"]) E["chat-form"].addEventListener("submit", function (e) { e.preventDefault(); envoyerMessage(); });
+  if (E["chat-texte"]) {
+    E["chat-texte"].addEventListener("input", tailleChamp);
+    /* ENTREE ENVOIE, MAJ+ENTREE va a la ligne : c'est ce que fait toute
+       messagerie, et l'inverse surprend au premier message. */
+    E["chat-texte"].addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyerMessage(); }
+      // Sans cela, la touche M poserait une main levee pendant qu'on ecrit.
+      e.stopPropagation();
+    });
+  }
+  /* La barre rouvre comme on l'a laissee : qui s'en sert s'en sert tout le
+     temps, qui ne s'en sert pas ne doit pas la retrouver ouverte a chaque
+     rechargement. */
+  try { if (localStorage.getItem("rail-ouvert") === "1") ouvrirRail(true); } catch (e) {}
+
   E["btn-participants"].addEventListener("click", function () { E.panneau.hidden = !E.panneau.hidden; });
   E["fermer-panneau"].addEventListener("click", function () { E.panneau.hidden = true; });
   if (E["btn-vocal"]) E["btn-vocal"].addEventListener("click", function () { agir({ op: "definirLienVocal", url: (E["vocal-url"].value || "").trim() }); });
