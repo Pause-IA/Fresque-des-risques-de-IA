@@ -1322,13 +1322,26 @@ await bloc("Mains levees et conversation", async () => {
     Math.round(vuMain) + " ms");
   await dodo(LATENCE_ECRIT + 1400);
 
-  /* LEVER DEUX FOIS NE COUTE PAS SA PLACE : un double-clic arrive tout le
-     temps, et un renvoi apres coupure reseau aussi. */
-  const avant = await file(C);
+  /* UN DOUBLE-CLIC NE LAISSE PAS UN ETAT BATARD. Le bouton est une bascule :
+     deux clics, c'est lever puis baisser, et il faut que la main redescende
+     VRAIMENT, chez soi comme chez les autres. L'autre cas, celui du renvoi
+     reseau (deux fois « lever » sans « baisser » entre les deux), ne passe pas
+     par le bouton : il est verifie dans serveur/tests/regles.test.mjs, ou l'on
+     peut emettre l'action deux fois. */
+  /* On attend que C VOIE sa main baissee avant de cliquer : une bascule agit
+     sur ce qu'on a sous les yeux, et l'animateur·ice vient de la baisser a
+     distance. Cliquer avant que l'info arrive, c'est demander a lever, et le
+     test accuserait le code de ce que la latence a fait. */
+  await C.waitForFunction(() => document.getElementById("btn-main").getAttribute("aria-pressed") === "false",
+    null, { timeout: 15000 }).catch(() => {});
+  const avantDbl = await file(B);
   await C.evaluate(() => { const b = document.getElementById("btn-main"); b.click(); b.click(); });
-  await dodo(LATENCE_ECRIT + 1400);
-  t("lever la main deux fois ne renvoie pas en fin de file",
-    (await file(C)).join(",") === avant.join(","), "avant " + avant.join(",") + " apres " + (await file(C)).join(","));
+  await dodo(LATENCE_ECRIT + 1600);
+  t("un double-clic laisse la main baissee",
+    (await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"))) === "false");
+  t("et la file des autres n'a pas bouge",
+    (await file(B)).join(",") === avantDbl.join(","),
+    "avant " + avantDbl.join(",") + " apres " + (await file(B)).join(","));
 
   /* L'ANIMATEUR·ICE DONNE LA PAROLE : la file avance pour tout le monde. */
   const premier = (await file(A))[0];
