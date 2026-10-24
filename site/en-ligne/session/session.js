@@ -223,6 +223,12 @@
       ["#z-moins", "aria-label", "Zoom out"], ["#z-plus", "aria-label", "Zoom in"],
       ["#fermer-panneau", "aria-label", "Close"], ["#modal-close", "aria-label", "Close"],
       ["#causerie-fermer", "aria-label", "Close the chat"], ["#causerie-poignee", "aria-label", "Move the chat"],
+      ["#chat-emo", "title", "Add an emoji"], ["#chat-emo", "aria-label", "Add an emoji"],
+      ["#chat-vite", "aria-label", "React in one tap"], ["#chat-palette", "aria-label", "Emoji"],
+      ['#chat-vite button[data-emo="👍"]', "title", "Agreed"],
+      ['#chat-vite button[data-emo="👏"]', "title", "Well said"],
+      ['#chat-vite button[data-emo="❓"]', "title", "Question"],
+      ['#chat-vite button[data-emo="⏳"]', "title", "I need a moment"],
       ["#causerie-poignee", "title", "Move the chat"], ["#chat-texte", "placeholder", "Write to the group…"],
       ["#chat-envoyer", "aria-label", "Send"], ["#btn-main", "title", "Ask to speak (M)"],
       ["#btn-rail", "title", "Chat and raised hands (C)"],
@@ -293,7 +299,8 @@
    "causerie","causerie-corps","causerie-toggle","causerie-poignee","causerie-fermer",
    "causerie-pastille","btn-rail","rail-pastille","btn-main","main-rang",
    "mains-liste","mains-nb","mains-vide","mains-vider",
-   "chat-fil","chat-vide","chat-form","chat-texte","chat-etat"].forEach(function (id) {
+   "chat-fil","chat-vide","chat-form","chat-texte","chat-etat",
+   "chat-vite","chat-emo","chat-palette"].forEach(function (id) {
     E[id] = document.getElementById(id);
   });
   traduireStatique();
@@ -1009,6 +1016,9 @@
       /* LE RANG EST UN CHIFFRE. Dans une liste, il faut compter pour savoir
          qui est troisieme ; ici on le lit. */
       li.innerHTML = '<span class="main-rang-pastille" aria-hidden="true">' + (i + 1) + '</span>'
+        /* LA MAIN, EN SIGNE. Le rang dit quand on parlera, le signe dit de
+           quoi il s'agit : on reconnait la file de parole sans lire. */
+        + '<span class="main-signe" aria-hidden="true">✋</span>'
         + '<span class="main-nom">' + esc(m.prenom) + '</span>'
         /* Une main levee par quelqu'un dont l'onglet s'est ferme reste a sa
            place : on la signale plutot que de la faire disparaitre, et
@@ -1069,9 +1079,13 @@
         d.className = "msg" + (m.par === moi ? " moi" : "")
           + (precedent === m.par ? " suite" : "")
           + (String(m.id).charAt(0) === "~" ? " envoi" : "");
+        /* UN MESSAGE QUI N'EST QUE DES SIGNES SE LIT EN GRAND : « 👍 » rendu a
+           la taille d'une phrase se perd dans la colonne, alors que c'est
+           justement ce qu'on veut voir d'un coup d'oeil. */
+        var queSignes = !/[\p{L}\p{N}]/u.test(m.texte) && m.texte.length <= 8;
         d.innerHTML = '<p class="msg-tete"><span class="msg-qui">' + esc(m.prenom)
           + '</span><span>' + esc(heure(m.ts)) + '</span></p>'
-          + '<p class="msg-corps">' + esc(m.texte) + '</p>';
+          + '<p class="msg-corps' + (queSignes ? ' signes' : '') + '">' + esc(m.texte) + '</p>';
         hote.appendChild(d);
         precedent = m.par;
       });
@@ -1191,7 +1205,7 @@
        suite, parce qu'on enchaine, et le texte revient dans la boite si le
        serveur refuse. Perdre une phrase qu'on vient de taper est pire que la
        voir revenir. */
-    champ.value = ""; tailleChamp();
+    champ.value = ""; tailleChamp(); ouvrirPalette(false);
     agir({ op: "envoyerMessage", texte: texte }, function (rep) {
       if (rep && rep.refus) {
         if (E["chat-etat"]) E["chat-etat"].textContent = rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec);
@@ -1202,6 +1216,54 @@
 
   // Le champ grandit avec le message, dans la limite fixee par la feuille de
   // style : trois lignes tapees dans une case d'une ligne, on ne se relit pas.
+  /* ── EMOJI ────────────────────────────────────────────────
+     POURQUOI. Pendant qu'on anime, taper « oui je suis d'accord » coute plus
+     cher que ce que ca rapporte : on ne le fait pas, et le fil reste vide
+     alors que le groupe a des choses a dire. Un signe suffit, et il se lit
+     d'un coup d'oeil dans la colonne.
+
+     PAS DE BIBLIOTHEQUE NI DE CATALOGUE COMPLET : une poignee de signes utiles
+     en atelier, ecrits en clair dans la page. Rien a charger, rien a mettre a
+     jour, et aucune requete sortante (la politique de securite du site les
+     interdit, a juste titre). */
+  var EMOJIS = ["👍", "👎", "👏", "❓", "❗", "✅", "❌", "⏳", "💡", "🙂", "😅", "😮",
+    "🤔", "🙏", "❤️", "🔥", "🎯", "⚠️", "📌", "✋", "🎉", "😴", "🤯", "🧠"];
+
+  function remplirPalette() {
+    var hote = E["chat-palette"];
+    if (!hote || hote.childNodes.length) return;
+    EMOJIS.forEach(function (emo) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = emo;
+      b.setAttribute("aria-label", emo);
+      b.addEventListener("click", function () { insererEmoji(emo); });
+      hote.appendChild(b);
+    });
+  }
+  function ouvrirPalette(oui) {
+    var hote = E["chat-palette"]; if (!hote) return;
+    remplirPalette();
+    hote.hidden = !oui;
+    if (E["chat-emo"]) E["chat-emo"].setAttribute("aria-expanded", oui ? "true" : "false");
+    placerCauserie();
+    /* LA PALETTE PREND DE LA PLACE AU FIL : sans ce rappel, les derniers
+       messages sortaient par le haut au moment ou on ouvre les signes pour y
+       repondre. */
+    var f = E["chat-fil"]; if (f) f.scrollTop = f.scrollHeight;
+  }
+  /* ON INSERE AU CURSEUR, pas a la fin : on ajoute souvent un signe au milieu
+     d'une phrase deja ecrite, et le renvoyer en bout de ligne oblige a tout
+     recommencer. */
+  function insererEmoji(emo) {
+    var c = E["chat-texte"]; if (!c) return;
+    var a = c.selectionStart == null ? c.value.length : c.selectionStart;
+    var b = c.selectionEnd == null ? c.value.length : c.selectionEnd;
+    c.value = c.value.slice(0, a) + emo + c.value.slice(b);
+    var pos = a + emo.length;
+    try { c.setSelectionRange(pos, pos); } catch (e) {}
+    c.focus(); tailleChamp();
+  }
+
   function tailleChamp() {
     var c = E["chat-texte"]; if (!c) return;
     c.style.height = "auto";
@@ -1709,14 +1771,30 @@
     clearTimeout(_survolT);
     var lot = c.lot || 0;
     var coul = LOT_COULEUR[lot] || "#8a857b";
-    var h = '<span class="sv-num" style="background:' + coul + '">' + n + '</span>'
-      + '<span class="sv-bulles"><span class="sv-titre">' + esc(c.titre || "") + '</span>';
+    /* PAS D'ATTRIBUT `style=` DANS DU HTML. La politique de securite du site
+       (`style-src 'self'`) les ignore purement et simplement : la couleur du
+       lot serait perdue en production, et invisible ici ou le serveur de test
+       n'envoie aucune politique. On passe donc par le CSSOM. */
+    _survol.textContent = "";
+    var jeton = document.createElement("span");
+    jeton.className = "sv-num"; jeton.textContent = n;
+    jeton.style.background = coul;
+    var bulles = document.createElement("span");
+    bulles.className = "sv-bulles";
+    var titre = document.createElement("span");
+    titre.className = "sv-titre"; titre.textContent = c.titre || "";
+    bulles.appendChild(titre);
     if (lot && S.lotNom[lot]) {
-      h += '<span class="sv-lot"><i style="background:' + coul + '"></i>'
-        + esc(S.lotMot + " " + lot + " · " + S.lotNom[lot]) + '</span>';
+      var fam = document.createElement("span");
+      fam.className = "sv-lot";
+      var pastille = document.createElement("i");
+      pastille.style.background = coul;
+      fam.appendChild(pastille);
+      fam.appendChild(document.createTextNode(S.lotMot + " " + lot + " · " + S.lotNom[lot]));
+      bulles.appendChild(fam);
     }
-    h += '</span>';
-    _survol.innerHTML = h;
+    _survol.appendChild(jeton);
+    _survol.appendChild(bulles);
     _survol.hidden = false;
   }
   function masquerSurvol() { clearTimeout(_survolT); if (_survol) _survol.hidden = true; }
@@ -3228,7 +3306,13 @@
     el.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">'
       + '<path d="' + d + '" fill="none" stroke="#14110d" stroke-width="5.5" stroke-linejoin="round"/>'
       + '<path d="' + d + '" fill="' + coul + '" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/></svg>'
-      + '<span class="curseur-nom" style="--c:' + coul + '">' + esc(nom || "") + '</span>';
+      + '<span class="curseur-nom">' + esc(nom || "") + '</span>';
+    /* MEME RAISON QUE CI-DESSUS, et c'est une panne qui vivait la : la couleur
+       passait par un attribut `style=`, que `style-src 'self'` ignore. En
+       production, tous les prenoms portaient donc le meme fond gris de repli,
+       alors que la couleur est ce qui dit QUI est ou. */
+    var etiq = el.querySelector(".curseur-nom");
+    if (etiq) etiq.style.setProperty("--c", coul);
     el.hidden = !curs.montrer;
     return el;
   }
@@ -3907,6 +3991,20 @@
   if (E["causerie-fermer"]) E["causerie-fermer"].addEventListener("click", function () { ouvrirRail(false); });
   if (E["causerie-toggle"]) E["causerie-toggle"].addEventListener("click", function () { replierCauserie(!causReduite); });
   if (E["causerie-poignee"]) E["causerie-poignee"].addEventListener("pointerdown", function (e) { glisserCauserie(e, E["causerie-poignee"]); });
+  if (E["chat-emo"]) E["chat-emo"].addEventListener("click", function () {
+    ouvrirPalette(E["chat-palette"] && E["chat-palette"].hidden);
+  });
+  /* UN GESTE, UN MESSAGE. Ces quatre-la partent tout de suite : c'est leur
+     raison d'etre, et passer par le champ de saisie annulerait le gain. */
+  if (E["chat-vite"]) E["chat-vite"].addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-emo]");
+    if (!b) return;
+    agir({ op: "envoyerMessage", texte: b.dataset.emo }, function (rep) {
+      if (rep && rep.refus && E["chat-etat"]) {
+        E["chat-etat"].textContent = rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec);
+      }
+    }, true);
+  });
   if (E["btn-main"]) E["btn-main"].addEventListener("click", basculerMain);
   if (E["mains-vider"]) E["mains-vider"].addEventListener("click", function () { agir({ op: "viderMains" }, null, true); });
   if (E["chat-form"]) E["chat-form"].addEventListener("submit", function (e) { e.preventDefault(); envoyerMessage(); });

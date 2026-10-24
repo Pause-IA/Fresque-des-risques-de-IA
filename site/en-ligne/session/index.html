@@ -202,13 +202,27 @@
         <div class="rail-fil" id="chat-fil" role="log" aria-live="polite" aria-labelledby="causerie-titre"></div>
         <p class="rail-vide rail-vide-chat" id="chat-vide">Un mot à dire sans couper la parole&nbsp;? C'est ici.</p>
 
+        <!-- PARLER SANS ECRIRE. En atelier, l'essentiel de ce qu'on a a dire
+             dans le fil tient en un signe : d'accord, pas d'accord, je ne
+             comprends pas. Trois boutons qui envoient tout de suite valent
+             mieux que trois phrases a taper pendant qu'on anime. -->
+        <div class="rail-vite" id="chat-vite" role="group" aria-label="Réagir en un geste">
+          <button type="button" data-emo="👍" title="D'accord" aria-label="Envoyer : d'accord">👍</button>
+          <button type="button" data-emo="👏" title="Bravo" aria-label="Envoyer : bravo">👏</button>
+          <button type="button" data-emo="❓" title="Question" aria-label="Envoyer : question">❓</button>
+          <button type="button" data-emo="⏳" title="Il me faut un moment" aria-label="Envoyer : il me faut un moment">⏳</button>
+        </div>
+
         <form class="rail-ecrire" id="chat-form">
           <label class="sr-only" for="chat-texte">Votre message</label>
+          <button class="rail-emo" id="chat-emo" type="button" aria-expanded="false" aria-controls="chat-palette"
+            title="Ajouter un emoji" aria-label="Ajouter un emoji">☺</button>
           <textarea id="chat-texte" rows="1" maxlength="240" placeholder="Écrire au groupe…" autocomplete="off"></textarea>
           <button class="btn primaire ico" id="chat-envoyer" type="submit" aria-label="Envoyer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg>
           </button>
         </form>
+        <div class="rail-palette" id="chat-palette" hidden role="group" aria-label="Emoji"></div>
         <p class="rail-etat" id="chat-etat" role="status" aria-live="polite"></p>
       </div>
     </aside>

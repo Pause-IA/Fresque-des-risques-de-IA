@@ -603,6 +603,10 @@ Ressenti temps réel (le serveur est décrit en 7.2) :
     file avance) ou vide tout. Raccourci `M`.
   - **Fil de discussion** : les 40 derniers messages, 240 signes, débit borné
     côté serveur (3 messages / 5 s). Pastille de non-lus. Raccourci `C`.
+  - **Parler sans écrire** : quatre signes qui partent en un geste
+    (👍 👏 ❓ ⏳) et une palette d'emoji insérée au curseur. Aucune
+    bibliothèque, aucune requête : les signes sont écrits dans la page. Un
+    message qui n'est QUE des signes se rend en grand.
 - **Liens en pointillé** : une seconde catégorie de lien, visible de loin, sans
   vocabulaire imposé (`pointillerFleche`). Suit dans les deux exports.
 - **Flèches qui partagent une carte** : les points d'accroche se répartissent en

@@ -1430,6 +1430,44 @@ await bloc("Mains levees et conversation", async () => {
     (await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"))) === avantM
     && (await C.evaluate(() => document.getElementById("chat-texte").value)) === "comment");
 
+  /* PARLER SANS ECRIRE. Pendant qu'on anime, taper « oui je suis d'accord »
+     coute plus cher que ce que ca rapporte : on ne le fait pas, et le fil
+     reste vide alors que le groupe a des choses a dire. */
+  const nbMsg = (p) => p.evaluate(() => document.querySelectorAll("#chat-fil .msg").length);
+  const avantEmo = await nbMsg(B);
+  await C.evaluate(() => document.querySelector('#chat-vite button[data-emo="👍"]').click());
+  await dodo(LATENCE_ECRIT + 1600);
+  t("un signe part en un seul geste", (await nbMsg(B)) === avantEmo + 1,
+    avantEmo + " -> " + (await nbMsg(B)));
+  t("et il se lit en grand, pas noye dans la colonne",
+    await B.evaluate(() => {
+      const m = [...document.querySelectorAll("#chat-fil .msg-corps")].pop();
+      return !!m && m.classList.contains("signes") && parseFloat(getComputedStyle(m).fontSize) >= 18;
+    }));
+
+  /* LA PALETTE INSERE AU CURSEUR, pas en bout de ligne : on ajoute un signe au
+     milieu d'une phrase deja ecrite, et la renvoyer a la fin oblige a tout
+     recommencer. */
+  const insere = await C.evaluate(async () => {
+    const c = document.getElementById("chat-texte");
+    c.value = "deux cartes"; c.focus(); c.setSelectionRange(4, 4);
+    document.getElementById("chat-emo").click();
+    await new Promise((f) => setTimeout(f, 150));
+    const b = document.querySelector("#chat-palette button");
+    const signe = b.textContent;
+    b.click();
+    return { valeur: c.value, attendu: "deux" + signe + " cartes", ouverte: !document.getElementById("chat-palette").hidden };
+  });
+  t("la palette d'emoji s'ouvre", insere.ouverte);
+  t("et le signe s'insere la ou est le curseur", insere.valeur === insere.attendu,
+    insere.valeur + " / " + insere.attendu);
+  await C.evaluate(() => { document.getElementById("chat-texte").value = ""; document.getElementById("chat-emo").click(); });
+
+  /* LA MAIN LEVEE SE RECONNAIT SANS LIRE. */
+  t("chaque main levee porte son signe",
+    await A.evaluate(() => [...document.querySelectorAll("#mains-liste li")]
+      .every((li) => (li.querySelector(".main-signe") || {}).textContent === "✋")));
+
   /* LE PANNEAU SE REPLIE ET SE DEPLACE, comme la reserve : pose en colonne
      fixe, il mangeait une bande de l'ecran en permanence et se trouvait
      toujours devant quelque chose. */
