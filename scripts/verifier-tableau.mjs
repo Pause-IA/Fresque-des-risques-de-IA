@@ -164,7 +164,10 @@ const erreursJS = [];
 async function ouvrir(nom, jeton, role, opts) {
   opts = opts || {};
   const ctx = await nav.newContext({ viewport: { width: 1360, height: 860 },
-    reducedMotion: opts.reduit ? "reduce" : "no-preference" });
+    reducedMotion: opts.reduit ? "reduce" : "no-preference",
+    // L'export (PNG et SVG) passe par un telechargement : sans cela
+    // l'evenement n'arrive jamais et le banc attend dans le vide.
+    acceptDownloads: true });
   const p = await ctx.newPage();
   p.on("pageerror", (e) => erreursJS.push("[" + nom + "] " + e.message));
   p.on("console", (m) => { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) erreursJS.push("[" + nom + "] console: " + m.text()); });
@@ -1061,14 +1064,27 @@ await bloc("Tactile et export", async () => {
     else {
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: c.x, y: c.y, id: 0 }] });
       await dodo(160);
+      /* TROIS INFORMATIONS, TROIS FORMES : le numero (ce par quoi on se designe
+         les cartes a voix haute) dans un jeton a la couleur de son lot, le
+         titre dans sa bulle, la famille dans une autre. Une seule ligne de
+         texte les melangeait. */
       const vu = await T.evaluate(() => {
         const s = document.getElementById("survol-carte");
-        return { cache: s.hidden, txt: s.textContent };
+        const q = (c) => { const e = s.querySelector(c); return e ? e.textContent.trim() : null; };
+        const jeton = s.querySelector(".sv-num");
+        return { cache: s.hidden, num: q(".sv-num"), titre: q(".sv-titre"), lot: q(".sv-lot"),
+          fond: jeton ? getComputedStyle(jeton).backgroundColor : "",
+          taille: jeton ? parseFloat(getComputedStyle(jeton).fontSize) : 0 };
       });
       await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       t("toucher une carte donne son numero et son titre (pas de survol au doigt)",
-        !vu.cache && vu.txt.indexOf(c.n + " ·") === 0,
-        "encadre " + (vu.cache ? "cache" : "« " + vu.txt + " »") + " pour la carte " + c.n);
+        !vu.cache && vu.num === String(c.n) && !!vu.titre,
+        "encadre " + (vu.cache ? "cache" : JSON.stringify(vu)) + " pour la carte " + c.n);
+      t("le numero est gros et porte la couleur de son lot",
+        vu.taille >= 16 && /^rgb\(/.test(vu.fond || "") && vu.fond !== "rgba(0, 0, 0, 0)",
+        vu.taille + "px " + vu.fond);
+      t("et la famille de la carte est dite a part",
+        !!vu.lot && /lot|set/i.test(vu.lot), String(vu.lot));
     }
   }
 
@@ -1287,7 +1303,7 @@ await bloc("Mains levees et conversation", async () => {
 
   const ouvrirRail = (p) => p.evaluate(() => {
     const b = document.getElementById("btn-rail");
-    if (b && document.getElementById("rail").hidden) b.click();
+    if (b && document.getElementById("causerie").hidden) b.click();
   });
   const file = (p) => p.evaluate(() => [...document.querySelectorAll("#mains-liste li")]
     .map((li) => li.querySelector(".main-nom").textContent.trim()));
@@ -1322,23 +1338,31 @@ await bloc("Mains levees et conversation", async () => {
     Math.round(vuMain) + " ms");
   await dodo(LATENCE_ECRIT + 1400);
 
-  /* UN DOUBLE-CLIC NE LAISSE PAS UN ETAT BATARD. Le bouton est une bascule :
-     deux clics, c'est lever puis baisser, et il faut que la main redescende
-     VRAIMENT, chez soi comme chez les autres. L'autre cas, celui du renvoi
-     reseau (deux fois « lever » sans « baisser » entre les deux), ne passe pas
-     par le bouton : il est verifie dans serveur/tests/regles.test.mjs, ou l'on
-     peut emettre l'action deux fois. */
-  /* On attend que C VOIE sa main baissee avant de cliquer : une bascule agit
-     sur ce qu'on a sous les yeux, et l'animateur·ice vient de la baisser a
-     distance. Cliquer avant que l'info arrive, c'est demander a lever, et le
-     test accuserait le code de ce que la latence a fait. */
-  await C.waitForFunction(() => document.getElementById("btn-main").getAttribute("aria-pressed") === "false",
-    null, { timeout: 15000 }).catch(() => {});
+  /* UN DOUBLE-CLIC REVIENT A L'ETAT DE DEPART. Le bouton est une bascule :
+     deux clics, c'est lever puis baisser (ou l'inverse), et il faut que le
+     second geste soit vraiment pris en compte, chez soi comme chez les autres.
+
+     ON PART D'UN ETAT QU'ON A VU. Ce tableau est eventuellement coherent :
+     agir sur ce qu'on croit savoir, c'est tester la latence plutot que le
+     code. On attend donc de VOIR sa propre main baissee avant de commencer.
+     L'autre cas, le renvoi reseau (deux fois « lever » sans « baisser » entre
+     les deux), ne passe pas par le bouton : il est verifie dans
+     serveur/tests/regles.test.mjs, ou l'on peut emettre l'action deux fois. */
+  const mainVue = (p, valeur) => p.waitForFunction(
+    (v) => document.getElementById("btn-main").getAttribute("aria-pressed") === v,
+    valeur, { timeout: 20000 }).then(() => true, () => false);
+
+  await C.evaluate(() => {
+    if (document.getElementById("btn-main").getAttribute("aria-pressed") === "true") {
+      document.getElementById("btn-main").click();
+    }
+  });
+  t("on voit sa propre main redescendre", await mainVue(C, "false"));
+  await dodo(LATENCE_ECRIT + 1400);
   const avantDbl = await file(B);
   await C.evaluate(() => { const b = document.getElementById("btn-main"); b.click(); b.click(); });
-  await dodo(LATENCE_ECRIT + 1600);
-  t("un double-clic laisse la main baissee",
-    (await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"))) === "false");
+  t("un double-clic rend la main a son etat de depart", await mainVue(C, "false"));
+  await dodo(LATENCE_ECRIT + 1800);
   t("et la file des autres n'a pas bouge",
     (await file(B)).join(",") === avantDbl.join(","),
     "avant " + avantDbl.join(",") + " apres " + (await file(B)).join(","));
@@ -1380,7 +1404,7 @@ await bloc("Mains levees et conversation", async () => {
 
   /* UN MESSAGE RECU BARRE FERMEE DOIT SE SIGNALER, sinon la conversation ne
      sert a rien : on ne regarde pas une barre fermee. */
-  await C.evaluate(() => document.getElementById("rail-fermer").click());
+  await C.evaluate(() => document.getElementById("causerie-fermer").click());
   await dodo(300);
   await B.evaluate(() => {
     document.getElementById("chat-texte").value = "je dois partir a 17 h";
@@ -1406,17 +1430,108 @@ await bloc("Mains levees et conversation", async () => {
     (await C.evaluate(() => document.getElementById("btn-main").getAttribute("aria-pressed"))) === avantM
     && (await C.evaluate(() => document.getElementById("chat-texte").value)) === "comment");
 
-  /* LA BARRE NE COUVRE PAS LE TABLEAU AU POINT DE LE RENDRE INUTILISABLE :
-     elle est en surcouche, le tableau garde sa taille. */
+  /* LE PANNEAU SE REPLIE ET SE DEPLACE, comme la reserve : pose en colonne
+     fixe, il mangeait une bande de l'ecran en permanence et se trouvait
+     toujours devant quelque chose. */
+  const boite = (p) => p.evaluate(() => {
+    const r = document.getElementById("causerie").getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), h: Math.round(r.height) };
+  });
+  const avantRepli = await boite(C);
+  await C.evaluate(() => document.getElementById("causerie-toggle").click());
+  await dodo(300);
+  t("le panneau se replie", (await boite(C)).h < avantRepli.h / 2,
+    avantRepli.h + " -> " + (await boite(C)).h);
+  await C.evaluate(() => document.getElementById("causerie-toggle").click());
+  await dodo(300);
+  t("et se redeploie", (await boite(C)).h > avantRepli.h / 2);
+  const dep = await C.evaluate(async () => {
+    const po = document.getElementById("causerie-poignee");
+    const r = po.getBoundingClientRect();
+    const o = (x, y) => ({ bubbles: true, clientX: x, clientY: y, pointerId: 11, button: 0 });
+    po.dispatchEvent(new PointerEvent("pointerdown", o(r.x + 5, r.y + 5)));
+    po.dispatchEvent(new PointerEvent("pointermove", o(r.x + 125, r.y - 85)));
+    po.dispatchEvent(new PointerEvent("pointerup", o(r.x + 125, r.y - 85)));
+    await new Promise((f) => setTimeout(f, 120));
+    const z = document.getElementById("causerie").getBoundingClientRect();
+    return { x: Math.round(z.x), y: Math.round(z.y) };
+  });
+  t("et se deplace a la poignee", Math.abs(dep.x - avantRepli.x) > 60,
+    JSON.stringify(avantRepli) + " -> " + JSON.stringify(dep));
+  /* La place choisie est retenue : un panneau qui revient a sa place par
+     defaut a chaque rechargement, on cesse de le deplacer. */
+  t("et la place choisie est retenue",
+    await C.evaluate(() => { try { return !!JSON.parse(localStorage.getItem("fresque:causpos")); } catch (e) { return false; } }));
+
+  /* LE PANNEAU NE COUVRE PAS LE TABLEAU AU POINT DE LE RENDRE INUTILISABLE :
+     il est en surcouche, le tableau garde sa taille. */
   const place = await C.evaluate(() => {
-    const r = document.getElementById("rail").getBoundingClientRect();
+    const r = document.getElementById("causerie").getBoundingClientRect();
     const s = document.getElementById("scene").getBoundingClientRect();
     return { large: r.width, scene: s.width, dedans: r.right <= s.right + 1 && r.top >= s.top - 1 };
   });
-  t("la barre tient dans la scene sans la retailler", place.dedans && place.large > 200,
+  t("le panneau tient dans la scene sans la retailler", place.dedans && place.large > 200,
     JSON.stringify(place));
 
   await C.context().close();
+});
+
+/* ========================================================================== */
+/* DEUX FORMATS D'EXPORT, ET SANS ATTENDRE.
+   Le bouton n'apparaissait qu'une fois les 38 cartes posees : on ne pouvait
+   emporter ni la trace d'un lot termine, ni un travail en cours. Et le PNG
+   seul ne suffit pas : il ne s'agrandit pas sans bavouiller et ne se retouche
+   pas. Ce qui peut casser en silence : un SVG qui sort mais ne s'ouvre pas,
+   ou qui perd les illustrations, les fleches ou les pointilles. */
+console.log("\n--- Export PNG et SVG ---");
+await bloc("Export", async () => {
+  t("les deux formats sont dans le menu Affichage, sans condition",
+    await A.evaluate(() => {
+      const m = document.getElementById("menu-affichage");
+      return !!m && !!m.querySelector("#btn-export") && !!m.querySelector("#btn-export-svg");
+    }));
+
+  // Un lien en pointille, pour verifier qu'il voyage jusqu'a l'export.
+  await A.evaluate(() => {
+    const h = document.querySelector("#fleches .hit");
+    if (h) h.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await dodo(400);
+  await A.evaluate(() => { const b = document.querySelector(".fleche-pointille"); if (b) b.click(); });
+  await dodo(LATENCE_ECRIT + 1200);
+  t("un lien peut passer en pointille",
+    await A.evaluate(() => !!document.querySelector("#fleches .trait.pointille")));
+
+  await A.evaluate(() => document.getElementById("btn-affichage").click());
+  const attente = A.waitForEvent("download", { timeout: 40000 });
+  await A.evaluate(() => document.getElementById("btn-export-svg").click());
+  const d = await attente.catch(() => null);
+  t("le SVG se telecharge", !!d && /\.svg$/.test(d.suggestedFilename()), d ? d.suggestedFilename() : "aucun");
+  if (d) {
+    const dest = path.join(RACINE, "scripts", ".export-banc.svg");
+    await d.saveAs(dest);
+    const svg = fs.readFileSync(dest, "utf8");
+    fs.unlinkSync(dest);
+    t("il contient les illustrations des cartes", (svg.match(/<image /g) || []).length > 0,
+      (svg.match(/<image /g) || []).length + " images");
+    t("les fleches y sont des traits, pas des pixels", /<path /.test(svg));
+    t("et le pointille a suivi", /stroke-dasharray/.test(svg));
+    /* UN SVG QUI NE S'OUVRE PAS EST UN FICHIER MORT : on le rend vraiment. */
+    const ctxS = await nav.newContext({ viewport: { width: 900, height: 600 } });
+    const pgS = await ctxS.newPage();
+    const erreurs = [];
+    pgS.on("pageerror", (e) => erreurs.push(e.message));
+    await pgS.setContent('<img src="data:image/svg+xml;base64,' + Buffer.from(svg).toString("base64") + '" id="i">');
+    const bon = await pgS.evaluate(() => new Promise((ok) => {
+      const i = document.getElementById("i");
+      if (i.complete) return ok(i.naturalWidth > 0);
+      i.onload = () => ok(i.naturalWidth > 0);
+      i.onerror = () => ok(false);
+      setTimeout(() => ok(i.naturalWidth > 0), 3000);
+    }));
+    t("et il s'ouvre vraiment comme une image", bon && !erreurs.length, erreurs.join(" | "));
+    await ctxS.close();
+  }
 });
 
 /* ========================================================================== */

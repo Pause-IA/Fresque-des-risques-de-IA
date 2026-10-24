@@ -343,5 +343,28 @@ R.appliquer(sm, ma, { op: "clore" });
 r = R.appliquer(sm, mp2.jeton, { op: "envoyerMessage", texte: "encore ?" });
 t("une session close n'accepte plus de message", r.refus && r.refus.code === "session_close");
 
+/* ── TRAIT PLEIN OU POINTILLE ────────────────────────────────
+   Un groupe ne met pas la meme chose derriere tous ses liens. Le pointille
+   donne une seconde categorie, visible de loin, sans vocabulaire a apprendre.
+   Ce qui compte : l'etat bascule, il voyage dans la vue, et un plan qui n'en
+   a pas ne gagne pas un champ au passage (il doit rester celui d'avant). */
+const cp = R.creer("Léa", "POINT1");
+const sp = cp.session;
+sp.jetons[cp.jeton] = { role: "animateur", id: cp.idAnim };
+const jp = R.rejoindre(sp, "Ana");
+R.appliquer(sp, cp.jeton, { op: "poolAjouter", n: 1 });
+R.appliquer(sp, cp.jeton, { op: "poolAjouter", n: 2 });
+R.appliquer(sp, cp.jeton, { op: "poserCarte", n: 1, pos: { x: 200, y: 200 } });
+R.appliquer(sp, cp.jeton, { op: "poserCarte", n: 2, pos: { x: 700, y: 200 } });
+const rf = R.appliquer(sp, cp.jeton, { op: "creerFleche", de: 1, vers: 2 });
+const idf = rf.resultat && rf.resultat.id;
+t("une fleche neuve n'est pas pointillee", !("pointille" in R.vue(sp).tableau.fleches[0]));
+r = R.appliquer(sp, jp.jeton, { op: "pointillerFleche", id: idf });
+t("chacun·e peut passer un lien en pointillé", r.ok && R.vue(sp).tableau.fleches[0].pointille === true);
+r = R.appliquer(sp, jp.jeton, { op: "pointillerFleche", id: idf });
+t("et le repasser en trait plein", r.ok && !("pointille" in R.vue(sp).tableau.fleches[0]));
+r = R.appliquer(sp, jp.jeton, { op: "pointillerFleche", id: "inconnue" });
+t("une fleche inconnue ne casse rien", !!r.refus);
+
 console.log((ko === 0 ? "✅" : "❌") + " Règles : " + ok + " réussis, " + ko + " échoués");
 process.exit(ko === 0 ? 0 : 1);

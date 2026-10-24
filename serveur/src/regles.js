@@ -356,6 +356,15 @@ function bidirFleche(s, id) {
   var f = s.tableau.fleches.find(function (f) { return f.id === id; }); if (!f) return { refus: {} };
   f.bidir = !f.bidir; bump(s); return { ok: true };
 }
+/* TRAIT PLEIN OU POINTILLE. Un groupe ne met pas la meme chose derriere tous
+   ses liens : « cause », « aggrave », « hypothese ». Le pointille donne une
+   seconde categorie visible de loin, sans ajouter de vocabulaire a apprendre :
+   c'est le groupe qui decide ce qu'il veut en faire. */
+function pointillerFleche(s, id) {
+  var f = s.tableau.fleches.find(function (f) { return f.id === id; }); if (!f) return { refus: {} };
+  if (f.pointille) delete f.pointille; else f.pointille = true;
+  bump(s); return { ok: true, resultat: { pointille: !!f.pointille } };
+}
 function supprimerFleche(s, id) {
   s.tableau.fleches = s.tableau.fleches.filter(function (f) { return f.id !== id; }); bump(s); return { ok: true };
 }
@@ -532,6 +541,7 @@ function appliquerVraiment(s, jeton, info, estAnim, moi, d, op) {
     case "libellerFleche": return libellerFleche(s, d.id, d.libelle);
     case "taillerFleche": return taillerFleche(s, d.id, d.taille);
     case "bidirFleche": return bidirFleche(s, d.id);
+    case "pointillerFleche": return pointillerFleche(s, d.id);
     case "supprimerFleche": return supprimerFleche(s, d.id);
     case "creerTexte": return creerTexte(s, d.x, d.y, d.contenu);
     case "modifierTexte": return modifierTexte(s, d.id, d.contenu);
