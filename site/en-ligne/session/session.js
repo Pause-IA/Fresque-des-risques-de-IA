@@ -68,10 +68,8 @@
     titreRejoindre: "Join the workshop", sousRejoindre: "Enter your first name to join the shared board.",
     poolVide: "Waiting for the facilitator to add cards to the reserve.",
     poolVideAnim: "Add cards to the reserve from the card deck below.",
-    poolRemplirTxt: "Fill", poolViderTxt: "Empty",
+    poolRemplirTxt: "Fill",
     poolRemplirT: "Fill the reserve with the next available cards",
-    poolViderT: "Take every card out of the reserve",
-    confirmVider: "Take every card out of the reserve?",
     poolDeplacer: "Move the reserve panel",
     poolCaseVide: "free slot",
     reserveGlisser: "Drag a card onto the reserve, or click it",
@@ -151,10 +149,8 @@
     titreRejoindre: "Rejoindre l'atelier", sousRejoindre: "Entrez votre prénom pour rejoindre le tableau partagé.",
     poolVide: "En attente que l'animateur mette des cartes dans la réserve.",
     poolVideAnim: "Ajoutez des cartes à la réserve depuis le jeu de cartes, en bas.",
-    poolRemplirTxt: "Remplir", poolViderTxt: "Vider",
+    poolRemplirTxt: "Remplir",
     poolRemplirT: "Compléter la réserve avec les cartes suivantes",
-    poolViderT: "Enlever toutes les cartes de la réserve",
-    confirmVider: "Enlever toutes les cartes de la réserve ?",
     poolDeplacer: "Déplacer le panneau de la réserve",
     poolCaseVide: "emplacement libre",
     reserveGlisser: "Glissez une carte sur la réserve, ou cliquez-la",
@@ -222,14 +218,14 @@
       ["#btn-rassembler", "title", "Invite everyone to come and see what you see"],
       ["#z-moins", "aria-label", "Zoom out"], ["#z-plus", "aria-label", "Zoom in"],
       ["#fermer-panneau", "aria-label", "Close"], ["#modal-close", "aria-label", "Close"],
-      ["#causerie-fermer", "aria-label", "Close the chat"], ["#causerie-poignee", "aria-label", "Move the chat"],
+      ["#causerie-fermer", "aria-label", "Close the chat"], 
       ["#chat-emo", "title", "Add an emoji"], ["#chat-emo", "aria-label", "Add an emoji"],
       ["#chat-vite", "aria-label", "React in one tap"], ["#chat-palette", "aria-label", "Emoji"],
       ['#chat-vite button[data-emo="👍"]', "title", "Agreed"],
       ['#chat-vite button[data-emo="👏"]', "title", "Well said"],
       ['#chat-vite button[data-emo="❓"]', "title", "Question"],
       ['#chat-vite button[data-emo="⏳"]', "title", "I need a moment"],
-      ["#causerie-poignee", "title", "Move the chat"], ["#chat-texte", "placeholder", "Write to the group…"],
+      ["#causerie-toggle", "title", "Move the chat"], ["#chat-texte", "placeholder", "Write to the group…"],
       ["#chat-envoyer", "aria-label", "Send"], ["#btn-main", "title", "Ask to speak (M)"],
       ["#btn-rail", "title", "Chat and raised hands (C)"],
       ["#anim-prenom", "placeholder", "First name"], ["#join-prenom", "placeholder", "First name"],
@@ -296,7 +292,7 @@
    "btn-barres","btn-barres-show","btn-affichage","menu-affichage","dock","zone-outils","grp-zoom","btn-annuler","btn-rassembler",
    "liste-part","vocal-url","btn-vocal","vocal-lien","visio-top","modal","carte-grande","modal-flip",
    "modal-close","mg-img","mg-num","mg-tit","mg-vtit","mg-verso","mg-vimg",
-   "causerie","causerie-corps","causerie-toggle","causerie-poignee","causerie-fermer",
+   "causerie","causerie-corps","causerie-toggle","causerie-fleche","causerie-fermer",
    "causerie-pastille","btn-rail","rail-pastille","btn-main","main-rang",
    "mains-liste","mains-nb","mains-vide","mains-vider",
    "chat-fil","chat-vide","chat-form","chat-texte","chat-etat",
@@ -955,16 +951,34 @@
     poolPosChoisie = true;   // a partir d'ici, on respecte le choix de la personne
     try { localStorage.setItem("fresque:poolpos2", JSON.stringify(poolPos)); } catch (e) {}
   }
+  /* UNE SEULE ZONE POUR DEPLACER ET POUR PLIER.
+     La poignee « ⠿ » et le titre etaient deux boutons colles, chacun minuscule :
+     on visait l'un et on touchait l'autre. Ils n'en font plus qu'un, large, qui
+     se deplace au glisser et se plie au clic. Pour que les deux gestes ne se
+     marchent pas dessus, il faut un SEUIL : sans lui, bouger la fenetre de deux
+     pixels la repliait, et l'on finissait par ne plus savoir l'ouvrir. En
+     dessous du seuil c'est un clic, au-dessus c'est un deplacement, et le clic
+     qui suit un deplacement est avale. */
+  var SEUIL_GLISSE = 4;       // pixels
+  var FIN_GLISSE = 0;         // instant du dernier vrai deplacement
+  function glisseEnCours() {
+    if (Date.now() - FIN_GLISSE > 400) return false;
+    FIN_GLISSE = 0; return true;
+  }
+
   function glisserPanneauPool(e, poignee) {
     if (e.button && e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
     var z = E["pool"], r = rectScene();
-    // Des le premier mouvement la position devient celle de la personne : sinon
-    // placerPool() la ramenerait a son coin par defaut a chaque image.
-    poolPosChoisie = true;
-    var d = { mx: e.clientX, my: e.clientY, x: z.offsetLeft, y: z.offsetTop };
+    var d = { mx: e.clientX, my: e.clientY, x: z.offsetLeft, y: z.offsetTop, bouge: false };
     try { poignee.setPointerCapture(e.pointerId); } catch (x) {}
     function mv(ev) {
+      if (!d.bouge) {
+        if (Math.abs(ev.clientX - d.mx) + Math.abs(ev.clientY - d.my) < SEUIL_GLISSE) return;
+        // Des le premier VRAI mouvement la position devient celle de la
+        // personne : sinon placerPool() la ramenerait a son coin par defaut.
+        d.bouge = true; poolPosChoisie = true;
+      }
       poolPos = { x: d.x + (ev.clientX - d.mx), y: d.y + (ev.clientY - d.my) };
       placerPool();
     }
@@ -973,6 +987,8 @@
       poignee.removeEventListener("pointerup", fin);
       poignee.removeEventListener("pointercancel", fin);
       try { poignee.releasePointerCapture(ev.pointerId); } catch (x) {}
+      if (!d.bouge) return;                 // simple clic : le pli s'en charge
+      FIN_GLISSE = Date.now();
       poolPos = { x: z.offsetLeft, y: z.offsetTop }; memoriserPoolPos();
     }
     poignee.addEventListener("pointermove", mv);
@@ -1139,15 +1155,22 @@
     if (e.button && e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
     var z = E.causerie;
-    causPosChoisie = true;
-    var d = { mx: e.clientX, my: e.clientY, x: z.offsetLeft, y: z.offsetTop };
+    var d = { mx: e.clientX, my: e.clientY, x: z.offsetLeft, y: z.offsetTop, bouge: false };
     try { poignee.setPointerCapture(e.pointerId); } catch (x) {}
-    function mv(ev) { causPos = { x: d.x + (ev.clientX - d.mx), y: d.y + (ev.clientY - d.my) }; placerCauserie(); }
+    function mv(ev) {
+      if (!d.bouge) {
+        if (Math.abs(ev.clientX - d.mx) + Math.abs(ev.clientY - d.my) < SEUIL_GLISSE) return;
+        d.bouge = true; causPosChoisie = true;
+      }
+      causPos = { x: d.x + (ev.clientX - d.mx), y: d.y + (ev.clientY - d.my) }; placerCauserie();
+    }
     function fin(ev) {
       poignee.removeEventListener("pointermove", mv);
       poignee.removeEventListener("pointerup", fin);
       poignee.removeEventListener("pointercancel", fin);
       try { poignee.releasePointerCapture(ev.pointerId); } catch (x) {}
+      if (!d.bouge) return;                 // simple clic : le pli s'en charge
+      FIN_GLISSE = Date.now();
       causPos = { x: z.offsetLeft, y: z.offsetTop };
       try { localStorage.setItem("fresque:causpos", JSON.stringify(causPos)); } catch (x) {}
     }
@@ -1159,6 +1182,7 @@
     causReduite = !!oui;
     if (E["causerie-corps"]) E["causerie-corps"].hidden = causReduite;
     if (E["causerie-toggle"]) E["causerie-toggle"].setAttribute("aria-expanded", causReduite ? "false" : "true");
+    if (E["causerie-fleche"]) E["causerie-fleche"].textContent = causReduite ? "▸" : "▾";
     if (E.causerie) E.causerie.classList.toggle("repliee", causReduite);
     try { localStorage.setItem("fresque:causreduite", causReduite ? "1" : "0"); } catch (e) {}
     placerCauserie();
@@ -1306,17 +1330,16 @@
 
     var anim = etat.role === "animateur";
     var tete = document.createElement("div"); tete.className = "pool-tete";
-    var poignee = document.createElement("button");
-    poignee.type = "button"; poignee.className = "pool-poignee";
-    poignee.setAttribute("aria-label", S.poolDeplacer); poignee.title = S.poolDeplacer;
-    poignee.innerHTML = "<span aria-hidden='true'>⠿</span>";
-    poignee.addEventListener("pointerdown", function (e) { glisserPanneauPool(e, poignee); });
-    tete.appendChild(poignee);
-
-    var tog = document.createElement("button"); tog.type = "button"; tog.className = "pool-toggle";
+    var tog = document.createElement("button"); tog.type = "button"; tog.className = "pool-tete-bouton";
     tog.setAttribute("aria-expanded", poolReduit ? "false" : "true");
-    tog.textContent = (poolReduit ? "▸ " : "▾ ") + S.poolTitre + " " + pool.length + "/" + MAX_POOL;
+    tog.title = S.poolDeplacer;
+    tog.innerHTML = '<span class="pool-grip" aria-hidden="true">⠿</span>'
+      + '<span class="pool-fleche" aria-hidden="true">' + (poolReduit ? "▸" : "▾") + '</span>'
+      + '<span class="pool-nom"></span>';
+    tog.querySelector(".pool-nom").textContent = S.poolTitre + " " + pool.length + "/" + MAX_POOL;
+    tog.addEventListener("pointerdown", function (e) { glisserPanneauPool(e, tog); });
     tog.addEventListener("click", function () {
+      if (glisseEnCours()) return;           // on vient de deplacer : pas de pli
       poolReduit = !poolReduit;
       try { localStorage.setItem("fresque:poolreduit", poolReduit ? "1" : "0"); } catch (e) {}
       etat._sigPool = null; rendrePool(etat.vue || vue); placerPool();
@@ -1326,17 +1349,15 @@
 
     if (!poolReduit) {
       if (anim) {
-        // Remplir / vider le pool d'un geste : l'animateur n'a plus a cliquer
-        // les cartes une par une pour lancer ou nettoyer une manche.
+        /* « VIDER » N'AVAIT PAS D'EMPLOI. Remettre les huit cartes au jeu d'un
+           coup ne correspond a aucun moment de l'atelier : on retire une carte
+           precise avec son « ↩ ». Le bouton ne servait qu'a vider la reserve
+           par megarde, derriere une confirmation. « Remplir » reste. */
         var rem = document.createElement("button"); rem.type = "button"; rem.className = "pool-act";
         rem.textContent = S.poolRemplirTxt; rem.title = S.poolRemplirT;
         rem.disabled = pool.length >= MAX_POOL;
         rem.addEventListener("click", function () { agir({ op: "poolRemplir" }); });
-        var vid = document.createElement("button"); vid.type = "button"; vid.className = "pool-act";
-        vid.textContent = S.poolViderTxt; vid.title = S.poolViderT;
-        vid.disabled = pool.length === 0;
-        vid.addEventListener("click", function () { if (window.confirm(S.confirmVider)) agir({ op: "poolVider" }); });
-        tete.appendChild(rem); tete.appendChild(vid);
+        tete.appendChild(rem);
       }
       var moins = document.createElement("button"); moins.type = "button"; moins.className = "pool-taille pool-moins";
       moins.textContent = "−"; moins.setAttribute("aria-label", S.poolReduire); moins.title = S.poolReduire;
@@ -2658,7 +2679,6 @@
     switch (d.op) {
       case "poolAjouter": if (libre(n) && v.pool.length < 8) v.pool.push(n); break;
       case "poolRetirer": horsPool(n); break;
-      case "poolVider": v.pool = []; break;
       case "poolRemplir":
         for (var k = 1; k <= 38 && v.pool.length < 8; k++) { if (libre(k)) v.pool.push(k); }
         break;
@@ -4019,8 +4039,13 @@
   /* ---------- Barre laterale : file de parole et conversation ------------ */
   if (E["btn-rail"]) E["btn-rail"].addEventListener("click", function () { ouvrirRail(!rail.ouvert); });
   if (E["causerie-fermer"]) E["causerie-fermer"].addEventListener("click", function () { ouvrirRail(false); });
-  if (E["causerie-toggle"]) E["causerie-toggle"].addEventListener("click", function () { replierCauserie(!causReduite); });
-  if (E["causerie-poignee"]) E["causerie-poignee"].addEventListener("pointerdown", function (e) { glisserCauserie(e, E["causerie-poignee"]); });
+  if (E["causerie-toggle"]) {
+    E["causerie-toggle"].addEventListener("click", function () {
+      if (glisseEnCours()) return;          // on vient de deplacer : pas de pli
+      replierCauserie(!causReduite);
+    });
+    E["causerie-toggle"].addEventListener("pointerdown", function (e) { glisserCauserie(e, E["causerie-toggle"]); });
+  }
   if (E["chat-emo"]) E["chat-emo"].addEventListener("click", function () {
     ouvrirPalette(E["chat-palette"] && E["chat-palette"].hidden);
   });

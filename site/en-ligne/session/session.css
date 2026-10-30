@@ -112,7 +112,7 @@ body.lobby-animateur #lobby .lobby-cols>section:last-of-type{display:none}
   box-shadow:0 12px 34px rgba(27,26,23,.20);padding:.4rem .45rem .5rem}
 .causerie[hidden]{display:none !important}
 .causerie-tete{display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap}
-.causerie-toggle{display:flex;align-items:center;gap:.4rem}
+.causerie-toggle .causerie-pastille{flex:0 0 auto}
 .causerie-x{line-height:1}
 .causerie-corps{display:flex;flex-direction:column;min-height:0;overflow:hidden;
   background:var(--surface);border:1px solid var(--ligne);border-radius:10px}

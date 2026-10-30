@@ -181,10 +181,14 @@
          le coin droit. -->
     <aside class="causerie" id="causerie" hidden aria-labelledby="causerie-titre">
       <div class="causerie-tete">
-        <button type="button" class="pool-poignee causerie-poignee" id="causerie-poignee"
-          aria-label="Déplacer la conversation" title="Déplacer la conversation"><span aria-hidden="true">⠿</span></button>
-        <button type="button" class="pool-toggle causerie-toggle" id="causerie-toggle" aria-expanded="true">
-          <span id="causerie-titre">Conversation</span><b class="causerie-pastille" id="causerie-pastille" hidden>0</b>
+        <!-- UN SEUL BOUTON POUR DEPLACER ET POUR PLIER : voir SEUIL_GLISSE
+             dans session.js. Deux boutons colles, chacun minuscule, et l'on
+             visait l'un pour toucher l'autre. -->
+        <button type="button" class="pool-tete-bouton causerie-toggle" id="causerie-toggle"
+          aria-expanded="true" title="Déplacer la conversation">
+          <span class="pool-grip" aria-hidden="true">⠿</span>
+          <span class="pool-fleche" id="causerie-fleche" aria-hidden="true">▾</span>
+          <span class="pool-nom" id="causerie-titre">Conversation</span><b class="causerie-pastille" id="causerie-pastille" hidden>0</b>
         </button>
         <button type="button" class="pool-act causerie-x" id="causerie-fermer" aria-label="Fermer la conversation" title="Fermer">✕</button>
       </div>

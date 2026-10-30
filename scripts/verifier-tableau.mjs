@@ -1483,19 +1483,45 @@ await bloc("Mains levees et conversation", async () => {
   await C.evaluate(() => document.getElementById("causerie-toggle").click());
   await dodo(300);
   t("et se redeploie", (await boite(C)).h > avantRepli.h / 2);
-  const dep = await C.evaluate(async () => {
-    const po = document.getElementById("causerie-poignee");
-    const r = po.getBoundingClientRect();
+  /* UNE SEULE ZONE POUR DEPLACER ET POUR PLIER. Les deux boutons colles, la
+     poignee « ⠿ » et le titre, n'en font plus qu'un : on visait l'un et on
+     touchait l'autre. Un geste simule complet (appui, mouvement, relachement)
+     sur ce bouton doit DEPLACER sans plier. */
+  const geste = (p, id, dx, dy) => p.evaluate(async (a) => {
+    const b = document.getElementById(a.id);
+    const r = b.getBoundingClientRect();
+    const h0 = document.getElementById("causerie").getBoundingClientRect().height;
     const o = (x, y) => ({ bubbles: true, clientX: x, clientY: y, pointerId: 11, button: 0 });
-    po.dispatchEvent(new PointerEvent("pointerdown", o(r.x + 5, r.y + 5)));
-    po.dispatchEvent(new PointerEvent("pointermove", o(r.x + 125, r.y - 85)));
-    po.dispatchEvent(new PointerEvent("pointerup", o(r.x + 125, r.y - 85)));
-    await new Promise((f) => setTimeout(f, 120));
+    const x0 = r.x + 40, y0 = r.y + 8;
+    b.dispatchEvent(new PointerEvent("pointerdown", o(x0, y0)));
+    b.dispatchEvent(new PointerEvent("pointermove", o(x0 + a.dx, y0 + a.dy)));
+    b.dispatchEvent(new PointerEvent("pointerup", o(x0 + a.dx, y0 + a.dy)));
+    b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((f) => setTimeout(f, 150));
     const z = document.getElementById("causerie").getBoundingClientRect();
-    return { x: Math.round(z.x), y: Math.round(z.y) };
-  });
-  t("et se deplace a la poignee", Math.abs(dep.x - avantRepli.x) > 60,
+    return { x: Math.round(z.x), y: Math.round(z.y), h: Math.round(z.height), h0: Math.round(h0) };
+  }, { id, dx, dy });
+
+  t("la tete du panneau n'a plus qu'un bouton, qui deplace ET qui plie",
+    await C.evaluate(() => {
+      const t = document.querySelector("#causerie .causerie-tete");
+      return !!t && !t.querySelector(".pool-poignee") && !!t.querySelector(".pool-tete-bouton")
+        && !!t.querySelector(".pool-tete-bouton .pool-fleche");
+    }));
+
+  const dep = await geste(C, "causerie-toggle", 125, -85);
+  t("un vrai deplacement deplace le panneau", Math.abs(dep.x - avantRepli.x) > 60,
     JSON.stringify(avantRepli) + " -> " + JSON.stringify(dep));
+  /* LE PIEGE A EVITER : deplacer de deux pixels repliait le panneau, et l'on
+     finissait par ne plus savoir l'ouvrir. Au-dessus du seuil, le clic qui
+     suit le relachement est avale. */
+  t("et il ne se replie pas au passage", Math.abs(dep.h - dep.h0) < 12,
+    dep.h0 + " -> " + dep.h);
+  const mini = await geste(C, "causerie-toggle", 2, 1);
+  t("un micro-deplacement reste un clic : le panneau se replie", mini.h < dep.h0 / 2,
+    dep.h0 + " -> " + mini.h);
+  const rouvert = await geste(C, "causerie-toggle", 0, 0);
+  t("et un clic franc le rouvre", rouvert.h > dep.h0 / 2, mini.h + " -> " + rouvert.h);
   /* La place choisie est retenue : un panneau qui revient a sa place par
      defaut a chaque rechargement, on cesse de le deplacer. */
   t("et la place choisie est retenue",
@@ -1551,6 +1577,21 @@ await bloc("Mains levees et conversation", async () => {
       fond: av, pasDansActions: !b.closest(".pool-actions")
     };
   });
+  /* « VIDER » RETIRE. Remettre les huit cartes au jeu d'un coup ne correspond
+     a aucun moment de l'atelier : le bouton ne servait qu'a vider la reserve
+     par megarde. On verifie qu'il a disparu, et que « Remplir » est reste. */
+  const actes = await A.evaluate(async () => {
+    const p = document.getElementById("pool");
+    if (p.classList.contains("replie")) {
+      p.querySelector(".pool-tete-bouton").click();
+      await new Promise((f) => setTimeout(f, 200));
+    }
+    return [...document.querySelectorAll("#pool .pool-act")].map((b) => (b.textContent || "").trim());
+  });
+  t("le bouton « Vider » de la reserve a disparu, « Remplir » est reste",
+    actes.some((x) => /remplir|fill/i.test(x)) && !actes.some((x) => /vider|empty/i.test(x)),
+    actes.join(" / ") || "aucun bouton : cas non couvert");
+
   t("le bouton agrandir de la reserve est en haut a droite de la carte",
     !!agr && agr.hautDroite && agr.pasDansActions, JSON.stringify(agr));
   const ouvreEnGrand = await C.evaluate(async () => {
