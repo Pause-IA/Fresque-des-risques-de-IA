@@ -20,7 +20,10 @@
    L'adresse e-mail laissee par un animateur n'est JAMAIS renvoyee : elle sert
    a lui repondre, pas a etre publiee.
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const L = require("../../serveur/src/limites.js");
 const C = require("../../serveur/src/commentaires.js");
 
@@ -28,8 +31,8 @@ const C = require("../../serveur/src/commentaires.js");
 // d'affilee apres son atelier), assez bas pour couper un robot.
 const SEUIL = { limite: 30, fenetreMs: 60 * 60 * 1000 };
 
-function store() { return getStore({ name: "fresque-commentaires" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
+function store() { return magasin("fresque-commentaires"); }
+function limites() { return magasin("fresque-limites"); }
 
 const json = (statut, corps) => ({
   statusCode: statut,

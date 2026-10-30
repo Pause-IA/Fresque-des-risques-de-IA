@@ -13,7 +13,10 @@
      voir { code }                              -> { atelier: vuePublique }  (meme prive : le lien fait foi)
      inscrire { code, prenom, mail }            -> { atelier: vueConfirmation }
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/ateliers.js");
 const R = require("../../serveur/src/regles.js");
 const L = require("../../serveur/src/limites.js");
@@ -44,10 +47,10 @@ let LIEN = LIENS.SITE;
 function fixerLien(event) { LIEN = LIENS.pour(event); }
 const TTL_PURGE_MS = 7 * 24 * 60 * 60 * 1000; // on garde les ateliers 7 j apres leur date
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
-function sessions() { return getStore({ name: "fresque-sessions" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
-function contacts() { return getStore({ name: "fresque-contacts" }); }
+function store() { return magasin("fresque-ateliers"); }
+function sessions() { return magasin("fresque-sessions"); }
+function limites() { return magasin("fresque-limites"); }
+function contacts() { return magasin("fresque-contacts"); }
 function cle(code) { return "atelier:" + code; }
 const json = (s, c) => ({ statusCode: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }, body: JSON.stringify(c) });
 

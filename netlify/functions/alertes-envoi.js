@@ -8,7 +8,9 @@
    Sans RESEND_API_KEY, ne fait rien.
 */
 "use strict";
-const { getStore } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/alertes.js");
 const At = require("../../serveur/src/ateliers.js");
 const mail = require("./lib/mail.js");
@@ -20,8 +22,8 @@ const h = G.h, mailHtml = G.mailHtml, bouton = G.bouton, boutonSecondaire = G.bo
 const LIENS = require("./lib/lien.js");
 const LIEN = LIENS.SITE;
 
-function storeAlertes() { return getStore({ name: "fresque-alertes" }); }
-function storeAteliers() { return getStore({ name: "fresque-ateliers" }); }
+function storeAlertes() { return magasin("fresque-alertes"); }
+function storeAteliers() { return magasin("fresque-ateliers"); }
 
 async function lireAbonnes() {
   const s = storeAlertes();

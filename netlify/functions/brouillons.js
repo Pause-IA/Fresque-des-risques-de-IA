@@ -21,13 +21,16 @@
    personnes moderent, et on ne perd pas son travail en changeant d'appareil.
 */
 "use strict";
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const B = require("../../serveur/src/brouillons.js");
 const FB = require("../../serveur/src/fresque-brouillon.js");
 const fs = require("fs");
 const path = require("path");
 
-function store() { return getStore({ name: "fresque-brouillons" }); }
+function store() { return magasin("fresque-brouillons"); }
 
 const json = (s, c) => ({
   statusCode: s,

@@ -21,7 +21,9 @@
 
    Sans RESEND_API_KEY, elle observe et journalise, mais n'envoie rien. */
 "use strict";
-const { getStore } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const mail = require("./lib/mail.js");
 
 // L'adresse du site vient de lib/lien.js : celle du DEPLOIEMENT qui envoie,
@@ -44,7 +46,7 @@ const DELAI = 12000;
 const REPRISES = Number(process.env.SURVEILLANCE_REPRISES || 2);   // essais en plus
 const REPRISE_DELAI = Number(process.env.SURVEILLANCE_REPRISE_DELAI ?? 800);
 
-function store() { return getStore({ name: "fresque-limites" }); }
+function store() { return magasin("fresque-limites"); }
 
 function dormir(ms) { return ms > 0 ? new Promise(function (r) { setTimeout(r, ms); }) : Promise.resolve(); }
 

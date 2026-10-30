@@ -11,7 +11,10 @@
    POST { genre:"atelier"|"temoignage", ... } -> { ok:true }
 */
 "use strict";
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const R = require("../../serveur/src/retours.js");
 const L = require("../../serveur/src/limites.js");
 
@@ -19,8 +22,8 @@ const L = require("../../serveur/src/limites.js");
 // un robot qui aurait franchi le champ piege.
 const SEUIL = { limite: 20, fenetreMs: 60 * 60 * 1000 };
 
-function store() { return getStore({ name: "fresque-retours" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
+function store() { return magasin("fresque-retours"); }
+function limites() { return magasin("fresque-limites"); }
 
 const json = (s, c) => ({
   statusCode: s,

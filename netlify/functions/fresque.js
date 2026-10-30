@@ -9,7 +9,10 @@
      etat {code, jeton, version}    -> { etat } ou { inchange:true }
      agir {code, jeton, intention}  -> { etat } ou { refus }
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const R = require("../../serveur/src/regles.js");
 const L = require("../../serveur/src/limites.js");
 
@@ -35,11 +38,11 @@ const BALAYAGE_MS = 15 * 60 * 1000;
 // terre : « Erreur du service de sessions » des la creation. La fraicheur du
 // direct ne vient de toute facon pas d'ici mais du relais WebSocket, qui pousse
 // l'etat complet aux autres ; le magasin reste l'autorite et la memoire.
-function store() { return getStore({ name: "fresque-sessions" }); }
-function storeAteliers() { return getStore({ name: "fresque-ateliers" }); }
-function storePresence() { return getStore({ name: "fresque-presence" }); }
-function storeImages() { return getStore({ name: "fresque-images" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
+function store() { return magasin("fresque-sessions"); }
+function storeAteliers() { return magasin("fresque-ateliers"); }
+function storePresence() { return magasin("fresque-presence"); }
+function storeImages() { return magasin("fresque-images"); }
+function limites() { return magasin("fresque-limites"); }
 function cle(code) { return "session:" + code; }
 function clePres(code) { return "presence:" + code; }
 function cleImg(code) { return "image:" + code; }

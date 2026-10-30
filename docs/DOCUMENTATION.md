@@ -582,6 +582,16 @@ Chaque proposition (pull request) est publiée par Netlify à une adresse à ell
   d'essai (un prénom, un clic), et le bouton « Inviter » donne un lien **sur la
   même adresse**. `/admin/` porte un panneau « Essayer le tableau en direct »
   qui dit quelle version est ouverte et y entre directement.
+- **Les essais ne salissent pas les vraies données** (`netlify/functions/lib/magasin.js`).
+  `getStore` range à l'échelle du SITE : un atelier créé depuis une version de
+  test atterrissait à côté des vrais ateliers. Sur un déploiement de test, tout
+  passe donc par `getDeployStore`, un bac à sable **vide au départ et qui
+  disparaît avec le déploiement** ; en production, rien ne change. Conséquence
+  assumée : chaque nouveau commit d'une proposition donne un bac à sable neuf,
+  donc un atelier créé hier pour essayer n'y est plus aujourd'hui. Un test
+  interdit tout `getStore` direct dans les fonctions : un seul oubli ferait
+  écrire une version de test dans les vraies données, et cela ne se verrait
+  qu'en retrouvant un atelier d'essai dans l'agenda public.
 
 ## 11. Fresque en ligne (tableau collaboratif)
 

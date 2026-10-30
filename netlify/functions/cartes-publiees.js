@@ -23,7 +23,10 @@
    Ecrire, en revanche, demande ADMIN_TOKEN (voir brouillons.js).
 */
 "use strict";
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const B = require("../../serveur/src/brouillons.js");
 const FB = require("../../serveur/src/fresque-brouillon.js");
 const fs = require("fs");
@@ -72,7 +75,7 @@ exports.handler = async (event) => {
   const fichierFresque = lireSource("fresque-reference.json");
 
   try {
-    const s = getStore({ name: "fresque-brouillons" });
+    const s = magasin("fresque-brouillons");
     const v = await s.get(CLE_PUBLIE, { type: "json" });
     /* LE PLAN DE LA FRESQUE VOYAGE AVEC LES TEXTES. Une seule requete pour les
        deux : l'outil les demande toujours ensemble, et les separer doublerait

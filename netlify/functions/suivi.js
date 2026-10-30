@@ -7,7 +7,9 @@
    demander ce qu'ils ont pense de l'atelier. Marque ensuite l'atelier comme
    suivi. Sans RESEND_API_KEY, ne fait rien. */
 "use strict";
-const { getStore } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/ateliers.js");
 const mail = require("./lib/mail.js");
 const G = require("./lib/gabarit.js");
@@ -58,8 +60,8 @@ function piedPauseIA(l, c) {
     + '<a href="https://www.facebook.com/Pause.IA/" style="color:#6b665e;">Facebook</a></p>');
 }
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
-function storeImages() { return getStore({ name: "fresque-images" }); }
+function store() { return magasin("fresque-ateliers"); }
+function storeImages() { return magasin("fresque-images"); }
 // Au-dela, l'image ne sert plus a rien et n'a pas a etre conservee.
 const IMG_LIMITE_MS = 7 * 24 * 60 * 60 * 1000;
 

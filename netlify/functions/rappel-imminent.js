@@ -5,7 +5,9 @@
    porte par les liens). Sans RESEND_API_KEY, ne fait rien. Complete le rappel de
    la veille (rappels.js). */
 "use strict";
-const { getStore } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/ateliers.js");
 const mail = require("./lib/mail.js");
 const G = require("./lib/gabarit.js");
@@ -18,7 +20,7 @@ const LIEN = LIENS.SITE;
 const T_MIN = 40 * 60 * 1000;   // pas avant 40 min
 const T_MAX = 80 * 60 * 1000;   // pas apres 80 min
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
+function store() { return magasin("fresque-ateliers"); }
 
 function lienRejoindre(a) { return LIEN + "/en-ligne/session/?code=" + a.code; }
 function lienOuvrir(a) {
