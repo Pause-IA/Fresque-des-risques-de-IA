@@ -263,14 +263,21 @@ body.canvas-noir #fleches .trait.bidir{stroke:#F0A860}
   background:var(--panel);border:1px solid var(--ligne);border-radius:14px;
   box-shadow:0 12px 34px rgba(27,26,23,.20);padding:.4rem .45rem .5rem}
 .pool-tete{display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap}
-.pool-poignee{flex:0 0 auto;border:1px solid var(--ligne);background:var(--doux);color:var(--gris);
-  border-radius:8px;width:1.7rem;height:1.7rem;display:grid;place-items:center;padding:0;
-  font-size:.9rem;line-height:1;cursor:grab;touch-action:none}
-.pool-poignee:active{cursor:grabbing}
-.pool-poignee:hover{color:var(--ink);border-color:var(--accent)}
-.pool-toggle{flex:1 1 auto;text-align:left;border:1px solid var(--ligne);background:var(--surface);color:var(--ink);
-  border-radius:8px;padding:.25rem .6rem;font-family:var(--f-titre);font-weight:700;font-size:.85rem;cursor:pointer;white-space:nowrap}
-.pool-toggle:hover{border-color:var(--accent)}
+/* LA TETE D'UN PANNEAU EST UN SEUL BOUTON : on l'attrape pour deplacer, on le
+   clique pour plier (voir SEUIL_GLISSE dans session.js). Deux boutons colles,
+   chacun large comme le pouce d'un enfant, et l'on visait l'un pour toucher
+   l'autre. Le curseur est la main ouverte du tableau : ce qu'on tient, on le
+   deplace. */
+.pool-tete-bouton{flex:1 1 auto;display:flex;align-items:center;gap:.4rem;text-align:left;
+  border:1px solid var(--ligne);background:var(--surface);color:var(--ink);
+  border-radius:8px;padding:.25rem .5rem;font-family:var(--f-titre);font-weight:700;font-size:.85rem;
+  cursor:grab;white-space:nowrap;touch-action:none}
+.pool-tete-bouton:active{cursor:grabbing}
+.pool-tete-bouton:hover{border-color:var(--accent)}
+.pool-tete-bouton .pool-grip{flex:0 0 auto;color:var(--gris);font-size:.9rem;line-height:1}
+.pool-tete-bouton:hover .pool-grip{color:var(--ink)}
+.pool-tete-bouton .pool-fleche{flex:0 0 auto;font-size:.7rem;line-height:1;color:var(--gris)}
+.pool-tete-bouton .pool-nom{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
 .pool-act{flex:0 0 auto;border:1px solid var(--ligne);background:var(--surface);color:var(--ink);border-radius:8px;
   padding:.25rem .5rem;font-family:var(--f-ui);font-weight:600;font-size:.72rem;cursor:pointer;white-space:nowrap}
 .pool-act:hover:not(:disabled){border-color:var(--accent);color:var(--accent-txt-fort)}
@@ -677,7 +684,7 @@ body.canvas-blanc .scene{--halo:#f7f5f0;--etiq-ink:#1b1a17}
    de tout cela ne peut ralentir un deplacement de carte. La liste est explicite,
    jamais `*` : une transition posee partout finirait par retarder quelque chose
    qui doit etre immediat. */
-.btn,.tool.ico,.pool-act,.pool-taille,.pool-poignee,.pool-toggle,.pool-carte .pool-x,
+.btn,.tool.ico,.pool-act,.pool-taille,.pool-tete-bouton,.pool-carte .pool-x,
 .deck-carte,.carte-actions .btn.mini,.aide-pop-x,.c-carte .agr,.coach .coach-x,.tuto-passer,
 .fleche-bidir,.fleche-croix,.texte-croix{
   transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease}
