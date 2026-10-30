@@ -51,7 +51,16 @@ test("l'espace n'est pas dans le plan du site", () => {
    L'exception s'arrete la : partout ailleurs, l'espace se transmet par courriel,
    et le guide ne doit toujours pas nommer la fresque de reference (test
    suivant), qui gacherait l'atelier a qui la verrait avant de le vivre. */
-const EXCEPTIONS = { "site/guide/index.html": ["animateurs/retours/"] };
+/* LES DEUX SEULES PAGES QUI ONT LE DROIT D'Y RENVOYER.
+   - Le guide, vers l'onglet Retours : c'est un document d'animateur·ices, et
+     le retour se depose la (choix assume, voir plus bas).
+   - /admin/, derriere ADMIN_TOKEN et `noindex` : c'est de la que l'on ouvre
+     l'espace pour le RELIRE sur le deploiement en cours. Ce n'est pas une
+     page publique ; elle n'est pas atteignable sans la cle. */
+const EXCEPTIONS = {
+  "site/guide/index.html": ["animateurs/retours/"],
+  "site/admin/index.html": ["animateurs/"]
+};
 
 test("aucune page publique n'y renvoie, sauf le guide vers l'onglet Retours", () => {
   const pages = [];
@@ -150,13 +159,15 @@ test("la validation des retours reste dans le module pur", () => {
 
 test("le mail d'un atelier programmé donne le lien de l'espace, et dit de le garder", () => {
   const src = lire("netlify/functions/ateliers.js");
-  assert.match(src, /const ESPACE_URL = LIEN \+ "\/animateurs\/"/,
+  /* L'adresse n'est plus figée au chargement du module : elle suit le
+     déploiement qui envoie l'e-mail (voir lib/lien.js), d'où une fonction. */
+  assert.match(src, /const espaceUrl = \(\) => LIEN \+ "\/animateurs\/"/,
     "le mail animateur·ice doit pointer l'espace");
   // Il apparaît dans les deux versions du mail : le repli texte compte autant
   // que le HTML, certains clients n'affichent que lui.
   const mail = src.slice(src.indexOf("function mailAnimateur"), src.indexOf("function mailParticipant"));
-  assert.ok(mail.includes("l.push(ESPACE_URL)"), "absent de la version texte");
-  assert.ok(/boutonSecondaire\(ESPACE_URL/.test(mail), "absent de la version HTML");
+  assert.ok(mail.includes("l.push(espaceUrl())"), "absent de la version texte");
+  assert.ok(/boutonSecondaire\(espaceUrl\(\)/.test(mail), "absent de la version HTML");
   assert.match(mail, /Gardez ce lien pour vous/,
     "le mail doit dire de ne pas diffuser le lien");
 });
@@ -194,8 +205,13 @@ test("aucun attribut style= : la CSP du site les ignore", () => {
   assert.ok(!/unsafe-inline/.test(sansApercu),
     "une autre règle que l'aperçu des e-mails autorise l'inline");
 
+  /* LE TABLEAU EN LIGNE EST SOUMIS A LA MEME REGLE, et il s'y est fait
+     prendre : la couleur du prénom au curseur passait par `style="--c:…"`,
+     donc ignorée en production, et tous les prénoms portaient le même gris de
+     repli alors que la couleur est ce qui dit QUI est où. */
   const scripts = ["site/animateurs/animateurs.js", "site/animateurs/minuteur/minuteur.js",
-                   "site/animateurs/kit/kit.js", "site/animateurs/antiseche/antiseche.js"];
+                   "site/animateurs/kit/kit.js", "site/animateurs/antiseche/antiseche.js",
+                   "site/en-ligne/session/session.js", "site/en-ligne/session/index.html"];
   for (const f of [...PAGES_ESPACE, ...scripts]) {
     const src = lire(f).replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
     assert.ok(!/\sstyle\s*=\s*["']/.test(src), `${f} contient un attribut style=`);

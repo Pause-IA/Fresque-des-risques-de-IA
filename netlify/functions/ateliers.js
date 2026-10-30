@@ -13,7 +13,10 @@
      voir { code }                              -> { atelier: vuePublique }  (meme prive : le lien fait foi)
      inscrire { code, prenom, mail }            -> { atelier: vueConfirmation }
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/ateliers.js");
 const R = require("../../serveur/src/regles.js");
 const L = require("../../serveur/src/limites.js");
@@ -26,13 +29,28 @@ const h = G.h, dateLisible = G.dateLisible, mailHtml = G.mailHtml, bouton = G.bo
 // L'adresse du site vient de lib/lien.js : celle du DEPLOIEMENT qui envoie,
 // pour qu'un courriel teste sur une preview y ramene au lieu de la production.
 const LIENS = require("./lib/lien.js");
-const LIEN = LIENS.SITE;
+/* L'ADRESSE DU SITE SUIT LA DEMANDE. Un atelier cree depuis un deploiement de
+   test doit renvoyer des liens vers CE deploiement : c'est tout l'objet d'une
+   relecture avant mise en ligne, et c'est ce qui manquait (« on cree un
+   atelier sur la preview, on suit le lien recu, on atterrit sur le vrai
+   site »). `fixerLien` est appele en tete de la fonction, avant toute
+   construction de message.
+
+   POURQUOI UNE VARIABLE DE MODULE plutot qu'un parametre passe aux quinze
+   endroits qui en ont besoin : le choix se fait une fois par requete, et les
+   deux seules valeurs possibles dans un meme deploiement sont nos propres
+   adresses (le domaine public et celle de Netlify). Deux requetes qui se
+   chevaucheraient ne pourraient donc echanger qu'un lien juste contre un
+   autre lien juste, jamais une adresse etrangere : `lien.js` n'accepte que
+   les notres. */
+let LIEN = LIENS.SITE;
+function fixerLien(event) { LIEN = LIENS.pour(event); }
 const TTL_PURGE_MS = 7 * 24 * 60 * 60 * 1000; // on garde les ateliers 7 j apres leur date
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
-function sessions() { return getStore({ name: "fresque-sessions" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
-function contacts() { return getStore({ name: "fresque-contacts" }); }
+function store() { return magasin("fresque-ateliers"); }
+function sessions() { return magasin("fresque-sessions"); }
+function limites() { return magasin("fresque-limites"); }
+function contacts() { return magasin("fresque-contacts"); }
 function cle(code) { return "atelier:" + code; }
 const json = (s, c) => ({ statusCode: s, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }, body: JSON.stringify(c) });
 
@@ -135,13 +153,13 @@ function boiteCompteur(n, max) {
     + '</tr></table></div>';
 }
 // Prenoms des inscrits sous forme de pastilles.
-const GUIDE_URL = LIEN + "/telechargements/guide-animateur-fresque-des-risques-de-l-ia.pdf";
+const guideUrl = () => LIEN + "/telechargements/guide-animateur-fresque-des-risques-de-l-ia.pdf";
 // Espace animateur·ices : fresque de référence et retours sur les cartes. La
 // page n'est référencée nulle part (noindex, hors sitemap, hors navigation) :
 // ce mail est l'un des deux seuls chemins pour y arriver, avec la fin du
 // guide. C'est voulu : la fresque de référence divulgâcherait l'atelier à un
 // participant qui la lirait avant d'y venir.
-const ESPACE_URL = LIEN + "/animateurs/";
+const espaceUrl = () => LIEN + "/animateurs/";
 // Bouton "Rejoindre la visio" (Google Meet, Discord...) si l'animateur a fourni un lien.
 // Secondaire : l'action principale reste le tableau en ligne.
 function boutonVisio(a) { return a && a.visio ? '<p style="margin:0 0 16px;text-align:center;">' + boutonSecondaire(a.visio, "Rejoindre la visioconférence") + '</p>' : ''; }
@@ -391,10 +409,10 @@ function mailAnimateur(a) {
   l.push("Lien de participation à partager : " + partageUrl);
   l.push("");
   l.push("Pour préparer votre animation, téléchargez le guide d'animation :");
-  l.push(GUIDE_URL);
+  l.push(guideUrl());
   l.push("");
   l.push("Votre espace animateur·ices, à garder pour vous : une fresque de référence (une disposition possible des 38 cartes, avec le lien que porte chaque flèche) et un endroit pour nous signaler ce qui cloche dans une carte.");
-  l.push(ESPACE_URL);
+  l.push(espaceUrl());
   l.push("Ne transmettez pas ce lien aux participant·es : chercher les liens soi-même est tout l'intérêt de l'atelier.");
   l.push("Une invitation calendrier est jointe à cet e-mail (avec un rappel la veille).");
   l.push("");
@@ -428,13 +446,13 @@ function mailAnimateur(a) {
   // n'apparait pas dans la liste publique), utile pour un atelier public.
   c += boiteLienPartage(partageUrl);
   c += '<p style="margin:0 0 12px;">Pour préparer votre animation, appuyez-vous sur le guide. Une invitation calendrier (avec rappel la veille) est jointe à cet e-mail.</p>';
-  c += '<p style="margin:0 0 20px;text-align:center;">' + boutonSecondaire(GUIDE_URL, "Télécharger le guide d'animation") + '</p>';
+  c += '<p style="margin:0 0 20px;text-align:center;">' + boutonSecondaire(guideUrl(), "Télécharger le guide d'animation") + '</p>';
   // Encadre distinct du reste : ce lien ne se diffuse pas, et cela doit se
   // voir au premier coup d'oeil, pas se lire dans une phrase.
   c += '<div style="border:1px dashed #ece9e2;background:#faf8f4;border-radius:10px;padding:14px 16px;margin:0 0 20px;">';
   c += '<p style="margin:0 0 8px;font-weight:600;">Votre espace animateur·ices</p>';
   c += '<p style="margin:0 0 12px;color:#4a473f;font-size:14px;">Une fresque de référence &mdash; une disposition possible des 38 cartes, avec le lien de cause à effet que porte chaque flèche &mdash; et un endroit pour nous signaler ce qui cloche dans une carte.</p>';
-  c += '<p style="margin:0 0 10px;text-align:center;">' + boutonSecondaire(ESPACE_URL, "Ouvrir mon espace") + '</p>';
+  c += '<p style="margin:0 0 10px;text-align:center;">' + boutonSecondaire(espaceUrl(), "Ouvrir mon espace") + '</p>';
   c += '<p style="margin:0;color:#6b665e;font-size:13px;"><strong>Gardez ce lien pour vous.</strong> Chercher les liens soi-même est tout l\'intérêt de l\'atelier : ne le transmettez pas aux participant·es, et ne l\'ouvrez pas devant eux.</p>';
   c += '</div>';
   if (a.mode === "enligne") {
@@ -493,6 +511,7 @@ function mailParticipant(a, participant) {
 
 exports.handler = async (event) => {
   try { connectLambda(event); } catch (e) {}
+  fixerLien(event);   // les liens des e-mails ramenent la ou l'on est
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: {} };
   if (event.httpMethod !== "POST") return json(405, { error: "Méthode non autorisée" });
   let d; try { d = JSON.parse(event.body || "{}"); } catch { d = {}; }
@@ -527,15 +546,19 @@ exports.handler = async (event) => {
     }
 
     if (d.op === "liste") {
-      const out = [];
+      /* On lit TOUS les ateliers publics, puis on decide lesquels montrer :
+         le complement des passes se compte sur l'ensemble, il ne peut pas se
+         decider atelier par atelier (voir A.pourCalendrier). */
+      const tous = [];
       const { blobs } = await st.list({ prefix: "atelier:" });
       for (const b of blobs) {
         try {
           const res = await st.getWithMetadata(b.key, { type: "json" });
           const a = res && res.data;
-          if (a && a.visibilite === "public" && A.visibleCalendrier(a)) out.push(A.vuePublique(a));
+          if (a && a.visibilite === "public") tous.push(a);
         } catch (e) {}
       }
+      const out = A.pourCalendrier(tous).map(A.vuePublique);
       out.sort((x, y) => A.instantDe(x) - A.instantDe(y));
       return json(200, { ateliers: out });
     }

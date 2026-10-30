@@ -3,9 +3,12 @@
    Si la variable d'environnement AUDIENCE_KEY est définie, la clé est exigée
    (protège l'accès aux chiffres) ; sinon l'accès est ouvert (chiffres non sensibles).
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 
-function store() { return getStore({ name: "audience" }); }
+function store() { return magasin("audience"); }
 const json = (statut, corps) => ({
   statusCode: statut,
   headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },

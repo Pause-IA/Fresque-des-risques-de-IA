@@ -561,6 +561,38 @@ eux).
 
 ---
 
+## 10 bis. Relire un changement avant de le mettre en ligne
+
+Chaque proposition (pull request) est publiée par Netlify à une adresse à elle
+(`deploy-preview-NN--<site>.netlify.app`). Trois choses la rendent utilisable :
+
+- **Un bandeau le dit** (`assets/js/deploiement.js`, feuille chargée par le
+  script lui-même, donc jamais demandée en production) : sur une adresse
+  `*.netlify.app`, un bandeau fixe annonce « Version de test » et affiche
+  l'adresse exacte. Il ne porte **aucun lien vers la production** : sortir de
+  la version de test par mégarde est précisément ce qu'on évite. Refermable
+  pour la durée de l'onglet.
+- **Les liens des e-mails suivent le déploiement** (`netlify/functions/lib/lien.js`).
+  Ils partent de l'hôte de la REQUÊTE quand il est l'un des nôtres (liste
+  blanche : un en-tête `Host` se forge), sinon de l'environnement. Et un
+  déploiement de test est reconnu à son adresse même si `CONTEXT`, qui est une
+  variable de *build*, n'arrive pas jusqu'à l'exécution : sans cela, un atelier
+  créé depuis une preview renvoyait vers le site public.
+- **On entre sans inscription** : `/en-ligne/session/` ouvre une session
+  d'essai (un prénom, un clic), et le bouton « Inviter » donne un lien **sur la
+  même adresse**. `/admin/` porte un panneau « Essayer le tableau en direct »
+  qui dit quelle version est ouverte et y entre directement.
+- **Les essais ne salissent pas les vraies données** (`netlify/functions/lib/magasin.js`).
+  `getStore` range à l'échelle du SITE : un atelier créé depuis une version de
+  test atterrissait à côté des vrais ateliers. Sur un déploiement de test, tout
+  passe donc par `getDeployStore`, un bac à sable **vide au départ et qui
+  disparaît avec le déploiement** ; en production, rien ne change. Conséquence
+  assumée : chaque nouveau commit d'une proposition donne un bac à sable neuf,
+  donc un atelier créé hier pour essayer n'y est plus aujourd'hui. Un test
+  interdit tout `getStore` direct dans les fonctions : un seul oubli ferait
+  écrire une version de test dans les vraies données, et cela ne se verrait
+  qu'en retrouvant un atelier d'essai dans l'agenda public.
+
 ## 11. Fresque en ligne (tableau collaboratif)
 
 Un seul mode, **multi-participants** (`en-ligne/session/`, `session.js`,
@@ -592,6 +624,32 @@ Ressenti temps réel (le serveur est décrit en 7.2) :
   l'objet s'appelle toujours `pool` (id, classes, ops serveur) ; seule
   l'interface dit « Réserve ».
 - **Jeu de cartes** (animateur) : les 38 cartes illustrées, une rangée qui défile.
+  Une carte de la réserve y retourne par le bouton « ↩ » (animateur·ice).
+- **Conversation et file de parole** : second panneau flottant, même mécanique
+  que la réserve (poignée, repli, place retenue par navigateur), en bas à
+  **gauche** par défaut. Deux fonctions que la visioconférence couvre mal quand
+  on a le tableau sous les yeux :
+  - **Mains levées** : l'ordre est fixé par le SERVEUR (`s.mains`, voir 7.2),
+    jamais par l'horloge d'un navigateur ; lever deux fois ne fait pas perdre sa
+    place ; le rang s'affiche en chiffre ; l'animateur·ice baisse une main (la
+    file avance) ou vide tout. Raccourci `M`.
+  - **Fil de discussion** : les 40 derniers messages, 240 signes, débit borné
+    côté serveur (3 messages / 5 s). Pastille de non-lus. Raccourci `C`.
+  - **Parler sans écrire** : quatre signes qui partent en un geste
+    (👍 👏 ❓ ⏳) et une palette d'emoji insérée au curseur. Aucune
+    bibliothèque, aucune requête : les signes sont écrits dans la page. Un
+    message qui n'est QUE des signes se rend en grand.
+- **Liens en pointillé** : une seconde catégorie de lien, visible de loin, sans
+  vocabulaire imposé (`pointillerFleche`). Suit dans les deux exports.
+- **Flèches qui partagent une carte** : les points d'accroche se répartissent en
+  éventail sur le bord quand leurs angles sont proches (`accroches()`), sinon
+  trois traits se confondaient sur leurs derniers pixels.
+- **Survol d'une carte** : numéro en gros dans un jeton à la couleur de son lot,
+  titre dans sa bulle, famille (« Lot 2 · Capacités ») dans une seconde.
+- **Export** : dans le menu « Affichage », **PNG** (à coller dans un compte
+  rendu) et **SVG** (vectoriel : impression en grand, retouche). Disponible dès
+  la première carte posée, plus seulement une fois les 38 placées. Les deux
+  partagent le même calcul de disposition (`disposerExport`).
 - **Cadrage** : « Tout voir » encadre le CONTENU (pas les 4400 x 2200 du plan) et
   le centre dans la partie de la scène que le panneau ne masque pas, qui peut
   donc déborder juste assez pour se dégager.

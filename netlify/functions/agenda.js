@@ -16,7 +16,10 @@
    Regles pures : serveur/src/agenda.js. Stockage : Netlify Blobs, meme magasin
    que la fonction ateliers. */
 "use strict";
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const G = require("../../serveur/src/agenda.js");
 
 // L'adresse du site vient de lib/lien.js : celle du DEPLOIEMENT qui envoie,
@@ -24,7 +27,7 @@ const G = require("../../serveur/src/agenda.js");
 const LIENS = require("./lib/lien.js");
 const BASE = LIENS.SITE;
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
+function store() { return magasin("fresque-ateliers"); }
 
 /* Partage entre origines : ces donnees sont deja publiques sur le site, et
    l'interet meme de cette adresse est qu'un autre projet la lise. On autorise

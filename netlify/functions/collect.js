@@ -6,12 +6,15 @@
 
    POST JSON : { p: chemin, r: hôte référent, u: 0|1 (vue unique/onglet), l: langue }
 */
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 
 const MAX_PAGES = 300;   // bornes pour éviter une croissance illimitée
 const MAX_REFS = 200;
 
-function store() { return getStore({ name: "audience" }); }
+function store() { return magasin("audience"); }
 const json = (statut, corps) => ({
   statusCode: statut,
   headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },

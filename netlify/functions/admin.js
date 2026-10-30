@@ -22,7 +22,10 @@
 */
 "use strict";
 const crypto = require("crypto");
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const Com = require("../../serveur/src/communes.js");
 const C = require("./lib/contacts.js");
 const R = require("../../serveur/src/retours.js");
@@ -37,9 +40,9 @@ const mail = require("./lib/mail.js");
 const BILLET = require("./lib/billet.js");
 const APERCUS = require("./lib/apercus.js");
 
-function contacts() { return getStore({ name: "fresque-contacts" }); }
-function retours() { return getStore({ name: "fresque-retours" }); }
-function alertes() { return getStore({ name: "fresque-alertes" }); }
+function contacts() { return magasin("fresque-contacts"); }
+function retours() { return magasin("fresque-retours"); }
+function alertes() { return magasin("fresque-alertes"); }
 
 /* Abonnes aux annonces « prochains ateliers ». On ne rend QUE des comptages :
    l'interet pour l'equipe est de savoir ou programmer le prochain atelier, pas
@@ -189,7 +192,7 @@ exports.handler = async (event) => {
          « je n'ai rien recu », la question se posait depuis un terminal.
          Aucune adresse n'y figure : voir serveur/src/journal.js. */
       if (q.action === "journal") {
-        const s2 = getStore({ name: "fresque-journal" });
+        const s2 = magasin("fresque-journal");
         const v = await s2.get("envois", { type: "json" }).catch(() => null);
         const liste = (v && v.liste) || [];
         return json(200, { journal: liste, bilan: JOURNAL.bilan(liste, Date.now()),

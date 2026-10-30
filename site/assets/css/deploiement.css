@@ -1,0 +1,42 @@
+/* Bandeau « version de test » (voir assets/js/deploiement.js).
+
+   CETTE FEUILLE N'EST CHARGEE QUE SUR UN DEPLOIEMENT DE TEST, par le script
+   lui-meme : le site public ne la demande jamais. C'est aussi ce qui evite de
+   recopier ces regles dans les trois feuilles du site (pages publiques,
+   tableau en ligne, administration), trois copies qui finiraient par diverger.
+*/
+/* ── « SUIS-JE SUR LE SITE, OU SUR UNE VERSION DE TEST ? » ───────────────────
+   Chaque proposition de changement est publiée à une adresse à elle, pour être
+   relue avant mise en ligne. Rien ne la distinguait du vrai site : on suit un
+   lien d'un ancien e-mail ou un favori, on se retrouve sur le site public sans
+   s'en apercevoir, et l'on conclut que « le changement n'y est pas ».
+   Le bandeau n'existe QUE sur une adresse de déploiement (voir
+   assets/js/deploiement.js) : sur le site public, ce bloc ne sert jamais. */
+.bandeau-apercu{
+  position:fixed;left:0;right:0;bottom:0;z-index:9000;
+  display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;
+  padding:.45rem clamp(.7rem,3vw,1.5rem);
+  background:#1b1a17;color:#fff;border-top:3px solid #E8811C;
+  font-family:var(--f-ui);font-size:.8rem;line-height:1.3
+}
+.bandeau-apercu strong{
+  background:#E8811C;color:#1b1a17;border-radius:999px;
+  padding:.1rem .55rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em
+}
+.bandeau-apercu .ba-texte{flex:1 1 14rem;min-width:0}
+.bandeau-apercu .ba-hote{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;
+  background:rgba(255,255,255,.12);border-radius:6px;padding:.1rem .4rem;
+  overflow:hidden;text-overflow:ellipsis;max-width:min(22rem,45vw);white-space:nowrap
+}
+.bandeau-apercu .ba-x{
+  margin-left:auto;flex:0 0 auto;width:1.7rem;height:1.7rem;border-radius:50%;
+  border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;
+  cursor:pointer;line-height:1;font-size:.75rem
+}
+.bandeau-apercu .ba-x:hover{background:rgba(255,255,255,.14)}
+.bandeau-apercu .ba-x:focus-visible{outline:2px solid #E8811C;outline-offset:2px}
+/* De la place en bas, pour que le bandeau ne couvre ni le pied de page ni la
+   dernière ligne d'un formulaire. */
+html.avec-apercu body{padding-bottom:3.2rem}
+@media print{.bandeau-apercu{display:none}}

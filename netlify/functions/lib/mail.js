@@ -29,8 +29,10 @@ function config() {
 // l'infra) ; le plafond ne bloque que lorsqu'on peut le lire de facon fiable.
 function magasin() {
   try {
-    var b = require("@netlify/blobs");
-    return b.getStore({ name: "fresque-limites" });
+    /* Le magasin du site en production, un bac a sable propre au deploiement
+       sur une version de test (voir magasin.js) : les compteurs d'envoi d'un
+       essai n'ont rien a faire dans ceux de la production. */
+    return require("./magasin.js").magasin("fresque-limites");
   } catch (e) { return null; }
 }
 function cadran(now) {
@@ -115,8 +117,7 @@ var JOURNAL = require("../../../serveur/src/journal.js");
 
 function magasinJournal() {
   try {
-    var b = require("@netlify/blobs");
-    return b.getStore({ name: "fresque-journal" });
+    return require("./magasin.js").magasin("fresque-journal");
   } catch (e) { return null; }
 }
 

@@ -62,3 +62,58 @@ test("plus aucune fonction ne recalcule l'adresse dans son coin", async () => {
   }
   assert.deepEqual(fautifs, [], "ces fonctions lisent encore SITE_URL directement");
 });
+
+/* ── LES LIENS SUIVENT LE DEPLOIEMENT QUI LES ENVOIE ──────────
+   SIGNALE PAR L'EQUIPE : « on cree un atelier depuis la preview, on suit le
+   lien recu, et l'on se retrouve sur le vrai site, sans le changement qu'on
+   voulait essayer ». Deux causes possibles, les deux traitees ici :
+   - `CONTEXT` est une variable de BUILD ; si elle n'arrive pas jusqu'a
+     l'execution des fonctions, l'ancienne regle retombait sur « production » ;
+   - l'hote de la requete dit sans ambiguite d'ou vient la demande. */
+test("sans CONTEXT, une adresse de deploy preview est reconnue quand meme", () => {
+  const r = L.calculer({
+    DEPLOY_PRIME_URL: "https://deploy-preview-33--fresquedesrisquedelia.netlify.app",
+    URL: "https://fresquedesrisquesdelia.org",
+    SITE_URL: "https://fresquedesrisquesdelia.org"
+  });
+  assert.equal(r, "https://deploy-preview-33--fresquedesrisquedelia.netlify.app");
+});
+
+test("en production, on garde le domaine public", () => {
+  assert.equal(L.calculer({ CONTEXT: "production", SITE_URL: "https://fresquedesrisquesdelia.org",
+    DEPLOY_PRIME_URL: "https://fresquedesrisquesdelia.org" }), "https://fresquedesrisquesdelia.org");
+});
+
+test("l'hote de la requete l'emporte : on revient la ou l'on etait", () => {
+  const ev = (h) => ({ headers: { host: h } });
+  assert.equal(L.pour(ev("deploy-preview-33--fresquedesrisquedelia.netlify.app"), {}),
+    "https://deploy-preview-33--fresquedesrisquedelia.netlify.app");
+  assert.equal(L.pour(ev("fresquedesrisquesdelia.org"), {}), "https://fresquedesrisquesdelia.org");
+  assert.equal(L.pour({ headers: { "x-forwarded-host": "fresquedesrisquesdelia.fr" } }, {}),
+    "https://fresquedesrisquesdelia.fr");
+});
+
+/* UN EN-TETE `Host` SE FORGE. Sans liste blanche, il suffirait d'appeler notre
+   fonction en se declarant « exemple-piege.fr » pour que nos e-mails partent
+   avec des liens vers ce domaine, signes de notre nom. */
+test("un hote etranger est ignore, on ne signe pas les liens de n'importe qui", () => {
+  const env = { CONTEXT: "production", SITE_URL: "https://fresquedesrisquesdelia.org" };
+  for (const faux of ["exemple-piege.fr", "fresquedesrisquesdelia.org.piege.fr",
+    "evil--fresquedesrisquedelia.netlify.app.piege.io", "localhost", ""]) {
+    assert.equal(L.pour({ headers: { host: faux } }, env), "https://fresquedesrisquesdelia.org", faux);
+  }
+});
+
+test("le port eventuel ne trompe pas la reconnaissance", () => {
+  assert.equal(L.pour({ headers: { host: "fresquedesrisquesdelia.org:443" } }, {}),
+    "https://fresquedesrisquesdelia.org");
+});
+
+test("et plusieurs hotes empiles ne font pas passer le second", () => {
+  // `x-forwarded-host` peut contenir une liste : seul le premier compte.
+  assert.equal(L.pour({ headers: { "x-forwarded-host": "fresquedesrisquesdelia.org, piege.fr" } }, {}),
+    "https://fresquedesrisquesdelia.org");
+  assert.equal(L.pour({ headers: { "x-forwarded-host": "piege.fr, fresquedesrisquesdelia.org" } },
+    { CONTEXT: "production", SITE_URL: "https://fresquedesrisquesdelia.org" }),
+    "https://fresquedesrisquesdelia.org");
+});

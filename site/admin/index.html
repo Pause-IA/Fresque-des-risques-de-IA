@@ -85,6 +85,30 @@
         <div id="resume-alertes" aria-live="polite"></div>
       </div>
 
+      <!-- ESSAYER LE TABLEAU, SANS PASSER PAR UNE INSCRIPTION.
+           Pour relire un changement du tableau en ligne, il fallait programmer
+           un atelier, attendre l'e-mail, suivre le lien : trois etapes qui
+           n'ont rien a voir avec ce qu'on veut regarder, et le lien d'un
+           ancien e-mail ramenait au site public. Ici, un clic ouvre une
+           session d'essai SUR CE DEPLOIEMENT, et le lien d'invitation reste
+           sur la meme adresse : ce que voient les collegues est bien ce qu'on
+           vient de changer. -->
+      <div class="panneau">
+        <div class="table-tete">
+          <h2>Essayer le tableau en direct</h2>
+        </div>
+        <p class="muted petit">Ouvre une session d'essai sur <strong>cette version du
+        site</strong>&nbsp;: aucun atelier programmé, aucun e-mail, rien d'enregistré côté
+        participant·es. Partagez ensuite le bouton «&nbsp;Inviter&nbsp;» du tableau : le lien
+        reste sur la même adresse, vos collègues verront donc la même version que vous.</p>
+        <p class="essai-ou">Version ouverte&nbsp;: <code id="essai-hote"></code> <span
+          class="essai-etiquette" id="essai-etiquette" hidden></span></p>
+        <p class="essai-actions">
+          <a class="btn" id="essai-tableau" href="../en-ligne/session/" target="_blank" rel="noopener">Ouvrir un tableau d'essai ↗</a>
+          <a class="btn" id="essai-espace" href="../animateurs/" target="_blank" rel="noopener">Ouvrir l'espace animateur·ices ↗</a>
+        </p>
+      </div>
+
       <div class="panneau">
         <div class="table-tete">
           <h2>Retours et témoignages <span id="compte-retours" class="pastille"></span></h2>
@@ -211,5 +235,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="../assets/js/admin.js" defer></script>
+  <script src="../assets/js/deploiement.js" defer></script>
 </body>
 </html>

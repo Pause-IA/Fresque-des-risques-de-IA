@@ -230,6 +230,22 @@
     }).catch(function (err) { toast(err.message); });
   });
 
+  /* --- Essayer le tableau, sur CETTE version du site ---------------------
+     Relire un changement du tableau en ligne demandait de programmer un
+     atelier, d'attendre l'e-mail et de suivre son lien : trois etapes sans
+     rapport avec ce qu'on veut regarder. On dit donc clairement QUELLE
+     version est ouverte, et on y entre directement. */
+  (function () {
+    var h = document.getElementById("essai-hote");
+    if (h) h.textContent = location.hostname;
+    var e = document.getElementById("essai-etiquette");
+    if (!e) return;
+    var test = /\.netlify\.app$/i.test(location.hostname);
+    e.hidden = false;
+    e.textContent = test ? "version de test" : "site public";
+    e.className = "essai-etiquette " + (test ? "est-test" : "est-public");
+  })();
+
   /* --- Reprise de session --- */
   var cle0 = "";
   try { cle0 = sessionStorage.getItem(CLE_STOCK) || ""; } catch (e) {}

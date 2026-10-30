@@ -6,7 +6,9 @@
    lien, et un lien discret permet a l'animateur d'ouvrir SA session.
    Sans RESEND_API_KEY, ne fait rien. */
 "use strict";
-const { getStore } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/ateliers.js");
 const mail = require("./lib/mail.js");
 const G = require("./lib/gabarit.js");
@@ -18,7 +20,7 @@ const LIENS = require("./lib/lien.js");
 const LIEN = LIENS.SITE;
 const FENETRE_MS = 26 * 60 * 60 * 1000;
 
-function store() { return getStore({ name: "fresque-ateliers" }); }
+function store() { return magasin("fresque-ateliers"); }
 
 // Liens porteurs du code : le code reste technique, il n'apparait nulle part.
 function lienRejoindre(a) { return LIEN + "/en-ligne/session/?code=" + a.code; }

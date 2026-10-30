@@ -25,7 +25,10 @@
 */
 "use strict";
 const crypto = require("crypto");
-const { getStore, connectLambda } = require("@netlify/blobs");
+const { connectLambda } = require("@netlify/blobs");
+/* Les donnees vont dans le magasin du SITE en production, et dans un bac a
+   sable propre au deploiement sur une version de test (voir lib/magasin.js). */
+const { magasin } = require("./lib/magasin.js");
 const A = require("../../serveur/src/alertes.js");
 const L = require("../../serveur/src/limites.js");
 const mail = require("./lib/mail.js");
@@ -35,12 +38,17 @@ const Com = require("../../serveur/src/communes.js");
 // L'adresse du site vient de lib/lien.js : celle du DEPLOIEMENT qui envoie,
 // pour qu'un courriel teste sur une preview y ramene au lieu de la production.
 const LIENS = require("./lib/lien.js");
-const LIEN = LIENS.SITE;
+/* Voir ateliers.js : l'adresse suit la demande, pour qu'un parcours lance
+   depuis un deploiement de test y revienne. Le jeton de confirmation est
+   range dans le magasin de CE deploiement ; un lien vers la production
+   tomberait sur un serveur qui ne le connait pas. */
+let LIEN = LIENS.SITE;
+function fixerLien(event) { LIEN = LIENS.pour(event); }
 
 const SEUIL = { limite: 10, fenetreMs: 60 * 60 * 1000 };
 
-function store() { return getStore({ name: "fresque-alertes" }); }
-function limites() { return getStore({ name: "fresque-limites" }); }
+function store() { return magasin("fresque-alertes"); }
+function limites() { return magasin("fresque-limites"); }
 
 const json = (s, c) => ({
   statusCode: s,
@@ -165,6 +173,7 @@ function mailMiseAJour(ab) {
 }
 
 exports.handler = async (event) => {
+  fixerLien(event);   // les liens de confirmation ramenent ici
   connectLambda(event);
   const s = store();
 
