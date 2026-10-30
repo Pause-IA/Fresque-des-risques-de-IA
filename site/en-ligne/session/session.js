@@ -1164,6 +1164,21 @@
     placerCauserie();
   }
 
+  /* UN AVERTISSEMENT QUI RESTE DEVIENT UN DECOR. « Doucement : attendez
+     quelques secondes » restait affiche jusqu'au message suivant, longtemps
+     apres etre devenu faux. On l'efface au bout de dix secondes. */
+  var DUREE_ETAT_CHAT = 10000;
+  var minuteurEtatChat = 0;
+  function direEtatChat(txt) {
+    var z = E["chat-etat"]; if (!z) return;
+    z.textContent = txt || "";
+    if (minuteurEtatChat) { clearTimeout(minuteurEtatChat); minuteurEtatChat = 0; }
+    if (txt) minuteurEtatChat = setTimeout(function () {
+      minuteurEtatChat = 0;
+      if (E["chat-etat"]) E["chat-etat"].textContent = "";
+    }, DUREE_ETAT_CHAT);
+  }
+
   function ouvrirRail(oui) {
     rail.ouvert = !!oui;
     if (E.causerie) E.causerie.hidden = !rail.ouvert;
@@ -1200,7 +1215,7 @@
     var champ = E["chat-texte"]; if (!champ) return;
     var texte = champ.value.trim();
     if (!texte) return;
-    if (E["chat-etat"]) E["chat-etat"].textContent = "";
+    direEtatChat("");
     /* LE CHAMP NE SE VIDE QU'A L'ENVOI REUSSI... non : il se vide tout de
        suite, parce qu'on enchaine, et le texte revient dans la boite si le
        serveur refuse. Perdre une phrase qu'on vient de taper est pire que la
@@ -1208,7 +1223,7 @@
     champ.value = ""; tailleChamp(); ouvrirPalette(false);
     agir({ op: "envoyerMessage", texte: texte }, function (rep) {
       if (rep && rep.refus) {
-        if (E["chat-etat"]) E["chat-etat"].textContent = rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec);
+        direEtatChat(rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec));
         if (!champ.value) { champ.value = texte; tailleChamp(); }
       }
     }, true);
@@ -1375,13 +1390,14 @@
     var verrou = par && par !== moiNom;   // carte en cours de prise par quelqu'un d'autre
     if (verrou) d.classList.add("occupee");
     d.innerHTML = '<div class="vis"><img alt="" src="' + srcCarte(c && c.image) + '"><span class="num">' + n + '</span>'
-      + (verrou ? '<span class="pool-verrou">🔒 ' + esc(par) + '</span>' : '') + '</div>'
+      + (verrou ? '<span class="pool-verrou">🔒 ' + esc(par) + '</span>' : '')
+      /* MEME GESTE, MEME PLACE, MEME SIGNE. La carte posee s'agrandit avec un
+         « ⤢ » en haut a droite de l'illustration ; celle de la reserve avait le
+         sien dans la rangee de boutons, d'une autre forme. On aligne. */
+      + '<button class="agr" data-a="agrandir" title="' + esc(S.agrandirCarte) + '" aria-label="' + esc(S.agrandirCarte) + '">⤢</button>'
+      + '</div>'
       + '<div class="tit">' + esc(c ? c.titre : "") + '</div>'
       + '<div class="pool-actions"><button class="btn primaire" data-a="poser" title="' + esc(S.prendre) + '"' + (verrou ? ' disabled' : '') + '>' + esc(S.poser) + '</button>'
-      /* MEME GESTE, MEME SYMBOLE. La carte posee s'agrandit avec « ⤢ » ; celle
-         de la reserve avec un bouton texte « Agrandir ». Deux signes pour la
-         meme action, dans la meme fenetre : on cherche le bon. */
-      + '<button class="btn agr-mini" data-a="agrandir" title="' + esc(S.agrandirCarte) + '" aria-label="' + esc(S.agrandirCarte) + '">⤢</button>'
       /* ✕ SE LIT « SUPPRIMER ». La carte n'est pas supprimee : elle retourne
          dans le jeu complet, d'ou on peut la remettre. Le signe et le texte le
          disent maintenant. */
@@ -1440,7 +1456,7 @@
   }
   function demarrerGlissePool(e, n, elCarte) {
     if (e.button && e.button !== 0) return;
-    if (e.target.closest(".pool-actions") || e.target.closest(".pool-x")) return; // clics boutons
+    if (e.target.closest(".pool-actions") || e.target.closest(".pool-x") || e.target.closest(".agr")) return; // clics boutons
     e.preventDefault();
     glissePool = { n: n, x0: e.clientX, y0: e.clientY, bouge: false, reserve: false, fantome: null, refuse: false, el: elCarte, pid: e.pointerId };
     // Ecouteurs sur le DOCUMENT (et non sur la carte) : ils survivent a une
@@ -3986,6 +4002,20 @@
     });
   }
   if (E["btn-rassembler"]) E["btn-rassembler"].addEventListener("click", envoyerAppelVue);
+  /* DEUX PANNEAUX FLOTTANTS, UN SEUL DEVANT. La conversation passait toujours
+     devant la reserve : poses cote a cote, l'un mangeait l'autre sans qu'on
+     puisse rien y faire. Celui qu'on touche passe devant, comme des feuilles
+     sur une table. */
+  function devant(z) {
+    [E["pool"], E.causerie].forEach(function (p) {
+      if (p) p.classList.toggle("devant", p === z);
+    });
+  }
+  ["pool", "causerie"].forEach(function (id) {
+    var z = E[id];
+    if (z) z.addEventListener("pointerdown", function () { devant(z); }, true);
+  });
+
   /* ---------- Barre laterale : file de parole et conversation ------------ */
   if (E["btn-rail"]) E["btn-rail"].addEventListener("click", function () { ouvrirRail(!rail.ouvert); });
   if (E["causerie-fermer"]) E["causerie-fermer"].addEventListener("click", function () { ouvrirRail(false); });
@@ -4000,8 +4030,8 @@
     var b = e.target.closest("button[data-emo]");
     if (!b) return;
     agir({ op: "envoyerMessage", texte: b.dataset.emo }, function (rep) {
-      if (rep && rep.refus && E["chat-etat"]) {
-        E["chat-etat"].textContent = rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec);
+      if (rep && rep.refus) {
+        direEtatChat(rep.refus.code === "trop_vite" ? S.chatTropVite : (rep.refus.message || S.chatEchec));
       }
     }, true);
   });
@@ -4149,14 +4179,43 @@
     if (ir > dr) { sw = sh * dr; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / dr; sy = (img.naturalHeight - sh) / 2; }
     ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
   }
-  function texteMulti(ctx, txt, x, y, maxw, lh, maxLignes) {
-    var mots = String(txt).split(" "), ligne = "", n = 0;
-    for (var i = 0; i < mots.length; i++) {
-      var essai = ligne ? ligne + " " + mots[i] : mots[i];
-      if (ctx.measureText(essai).width > maxw && ligne) { ctx.fillText(ligne, x, y); ligne = mots[i]; y += lh; if (++n >= maxLignes - 1) { ctx.fillText(mots.slice(i).join(" "), x, y); return; } }
-      else ligne = essai;
+  /* UNE SEULE DECOUPE POUR LES DEUX EXPORTS.
+     Le PNG mesurait le texte, le SVG comptait les caracteres : les intitules
+     longs etaient rognes dans le SVG seulement. Et les deux coupaient sur
+     /\s+/, ce qui ecrasait les retours a la ligne : une note en liste a puces
+     ressortait sur une seule ligne. On coupe donc d'abord aux retours a la
+     ligne, puis aux mots, en mesurant la vraie police. */
+  function couperLignes(txt, mesure, maxw, maxLignes) {
+    var lignes = [];
+    String(txt == null ? "" : txt).split(/\r?\n/).forEach(function (para) {
+      var mots = para.split(/[ \t]+/).filter(function (m) { return m !== ""; });
+      if (!mots.length) { lignes.push(""); return; }
+      var cur = "";
+      for (var i = 0; i < mots.length; i++) {
+        var essai = cur ? cur + " " + mots[i] : mots[i];
+        if (cur && mesure(essai) > maxw) { lignes.push(cur); cur = mots[i]; }
+        else cur = essai;
+      }
+      lignes.push(cur);
+    });
+    while (lignes.length && lignes[lignes.length - 1] === "") lignes.pop();
+    if (lignes.length > maxLignes) {
+      lignes = lignes.slice(0, maxLignes);
+      lignes[maxLignes - 1] = lignes[maxLignes - 1].replace(/[\s.]+$/, "") + "\u2026";
     }
-    ctx.fillText(ligne, x, y);
+    return lignes;
+  }
+  var canevasMesure = null;
+  function mesureur(police) {
+    return function (s) {
+      if (!canevasMesure) canevasMesure = document.createElement("canvas").getContext("2d");
+      canevasMesure.font = police;
+      return canevasMesure.measureText(s).width;
+    };
+  }
+  function texteMulti(ctx, txt, x, y, maxw, lh, maxLignes) {
+    couperLignes(txt, function (s) { return ctx.measureText(s).width; }, maxw, maxLignes)
+      .forEach(function (l, i) { if (l) ctx.fillText(l, x, y + i * lh); });
   }
   function teteFleche(ctx, fromx, fromy, tox, toy) {
     var a = Math.atan2(toy - fromy, tox - fromx), s = 9;
@@ -4276,16 +4335,20 @@
       return cv.toDataURL("image/jpeg", 0.82);
     } catch (e) { return null; }
   }
-  function lignesSvg(txt, maxCar, maxLignes) {
-    var mots = String(txt || "").split(/\s+/), lignes = [], cur = "";
-    for (var i = 0; i < mots.length; i++) {
-      var essai = cur ? cur + " " + mots[i] : mots[i];
-      if (essai.length > maxCar && cur) { lignes.push(cur); cur = mots[i]; if (lignes.length >= maxLignes) break; }
-      else cur = essai;
-    }
-    if (cur && lignes.length < maxLignes) lignes.push(cur);
-    return lignes;
-  }
+  /* CHAQUE BLOC EST DESSINE DANS LA BOITE QU'IL OCCUPE A L'ECRAN : son nombre
+     de lignes se deduit de cette hauteur, pas d'un maximum arbitraire. Un
+     plafond fixe a trois lignes rognait « Enracinement des systemes de controle
+     et d'oppression », alors que la carte, a l'ecran, lui en donne quatre. */
+  function lignesNote(h) { return Math.max(1, Math.round((h - 10) / 17)); }
+  /* L'INTITULE NE SE PERD JAMAIS. On ne sait pas, au moment de dessiner, si la
+     police de la carte est bien celle que le canevas mesure : si elle ne l'est
+     pas, la mesure demande une ligne de plus que la boite, et un plafond
+     calcule sur la hauteur de la carte faisait DISPARAITRE la fin du titre
+     (« Enracinement des systemes de controle et d'oppression »). On prefere une
+     ligne qui depasse de deux pixels a un titre ampute. */
+  var MAX_LIGNES_TITRE = 6;
+  var POLICE_TITRE = "700 13px 'Saira Condensed',sans-serif";
+  var POLICE_NOTE = "500 14px 'Montserrat',sans-serif";
   function exporterSVG(imagesCartes) {
     var tab = etat.vue && etat.vue.tableau;
     if (!tab) return;
@@ -4320,7 +4383,7 @@
           + '" preserveAspectRatio="xMidYMid slice" href="' + don + '"/>');
         g.push('<rect x="5" y="5" width="21" height="21" rx="5" fill="#E8811C"/>');
         g.push('<text x="15.5" y="16.5" text-anchor="middle" dominant-baseline="central" font-family="Saira Condensed,sans-serif" font-weight="700" font-size="13" fill="#ffffff">' + cc.n + '</text>');
-        lignesSvg(c ? c.titre : "", Math.max(10, Math.round((w - 16) / 6.1)), 3).forEach(function (l, i) {
+        couperLignes(c ? c.titre : "", mesureur(POLICE_TITRE), w - 16, MAX_LIGNES_TITRE).forEach(function (l, i) {
           g.push('<text x="8" y="' + (visH + 17 + i * 15) + '" font-family="Saira Condensed,sans-serif" font-weight="700" font-size="13" fill="#1b1a17">' + echapXml(l) + '</text>');
         });
         g.push('</g>');
@@ -4339,7 +4402,8 @@
         var el = etat.elTextes[t.id], w = el ? el.offsetWidth : 80, h = el ? el.offsetHeight : 30;
         var g = ['<g transform="translate(' + t.x + ',' + t.y + ')">'];
         g.push('<rect x="0" y="0" width="' + w + '" height="' + h + '" rx="6" fill="#fff7e6" stroke="#f0dfbc"/>');
-        lignesSvg(t.contenu, Math.max(8, Math.round((w - 18) / 7)), 6).forEach(function (l, i) {
+        couperLignes(t.contenu, mesureur(POLICE_NOTE), w - 18, lignesNote(h)).forEach(function (l, i) {
+          if (!l) return;
           g.push('<text x="9" y="' + (20 + i * 17) + '" font-family="Montserrat,sans-serif" font-weight="500" font-size="14" fill="#1b1a17">' + echapXml(l) + '</text>');
         });
         g.push('</g>');
@@ -4441,8 +4505,8 @@
       ctx.restore();
       ctx.fillStyle = "#E8811C"; coinRond(ctx, x + 5, y + 5, 21, 21, 5); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.font = "700 13px 'Saira Condensed',sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(cc.n, x + 15.5, y + 16.5);
-      ctx.fillStyle = "#1b1a17"; ctx.font = "700 13px 'Saira Condensed',sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
-      texteMulti(ctx, c ? c.titre : "", x + 8, y + visH + 6, w - 16, 15, 3);
+      ctx.fillStyle = "#1b1a17"; ctx.font = POLICE_TITRE; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      texteMulti(ctx, c ? c.titre : "", x + 8, y + visH + 6, w - 16, 15, MAX_LIGNES_TITRE);
       ctx.restore();
       ctx.strokeStyle = "#e6e2da"; ctx.lineWidth = 1; coinRond(ctx, x, y, w, h, 10); ctx.stroke();
     });
@@ -4458,8 +4522,8 @@
       var el = etat.elTextes[t.id], x = t.x, y = t.y, w = el ? el.offsetWidth : 80, h = el ? el.offsetHeight : 30;
       ctx.fillStyle = "#fff7e6"; coinRond(ctx, x, y, w, h, 6); ctx.fill();
       ctx.strokeStyle = "#f0dfbc"; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = "#1b1a17"; ctx.font = "500 14px 'Montserrat',sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
-      texteMulti(ctx, t.contenu, x + 9, y + 7, w - 18, 17, 6);
+      ctx.fillStyle = "#1b1a17"; ctx.font = POLICE_NOTE; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      texteMulti(ctx, t.contenu, x + 9, y + 7, w - 18, 17, lignesNote(h));
     });
     cv.toBlob(function (blob) {
       if (!blob) return;

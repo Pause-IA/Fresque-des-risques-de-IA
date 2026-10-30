@@ -1511,6 +1511,82 @@ await bloc("Mains levees et conversation", async () => {
   t("le panneau tient dans la scene sans la retailler", place.dedans && place.large > 200,
     JSON.stringify(place));
 
+  /* DEUX PANNEAUX FLOTTANTS, UN SEUL DEVANT. La conversation passait toujours
+     devant la reserve, quelle que soit la derniere touchee : poses cote a cote,
+     l'un mangeait l'autre sans recours. */
+  const devant = (p, id) => p.evaluate((q) => {
+    const z = document.getElementById(q);
+    const r = z.getBoundingClientRect();
+    const o = (x, y) => ({ bubbles: true, clientX: x, clientY: y, pointerId: 31, button: 0 });
+    z.dispatchEvent(new PointerEvent("pointerdown", o(r.x + 4, r.y + 4)));
+    const niv = (e) => {
+      const v = parseInt(getComputedStyle(e).zIndex, 10);
+      return isNaN(v) ? 0 : v;
+    };
+    return { pool: niv(document.getElementById("pool")), caus: niv(document.getElementById("causerie")) };
+  }, id);
+  const nPool = await devant(C, "pool");
+  t("toucher la reserve la fait passer devant la conversation", nPool.pool > nPool.caus,
+    JSON.stringify(nPool));
+  const nCaus = await devant(C, "causerie");
+  t("et toucher la conversation la ramene devant", nCaus.caus > nCaus.pool,
+    JSON.stringify(nCaus));
+
+  /* AGRANDIR : MEME PLACE QUE SUR LE TABLEAU. Le bouton etait dans la rangee
+     d'actions, sous la carte, alors qu'il est en haut a droite de
+     l'illustration partout ailleurs. */
+  /* A ce stade du banc la fresque est complete : « poolAjouter » serait refuse
+     et la reserve resterait vide. On y renvoie donc une carte du tableau. */
+  if (!(S.pool || []).length) R.appliquer(S, "jAnim", { op: "retirerCarte", n: 7, dest: "pool" });
+  noter();
+  await C.waitForFunction(() => !!document.querySelector('.pool-carte .vis .agr'), null, { timeout: 15000 }).catch(() => {});
+  const agr = await C.evaluate(() => {
+    const c = document.querySelector(".pool-carte");
+    const b = c && c.querySelector('.vis .agr[data-a="agrandir"]');
+    if (!b) return null;
+    const rc = c.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const av = getComputedStyle(b).backgroundColor;
+    return {
+      hautDroite: rb.top - rc.top < rc.height / 3 && rc.right - rb.right < rc.width / 3,
+      fond: av, pasDansActions: !b.closest(".pool-actions")
+    };
+  });
+  t("le bouton agrandir de la reserve est en haut a droite de la carte",
+    !!agr && agr.hautDroite && agr.pasDansActions, JSON.stringify(agr));
+  const ouvreEnGrand = await C.evaluate(async () => {
+    const b = document.querySelector('.pool-carte .vis .agr');
+    if (!b) return false;
+    b.click();
+    await new Promise((f) => setTimeout(f, 250));
+    const m = document.getElementById("modal");
+    return !!m && m.classList.contains("on");
+  });
+  t("et il ouvre toujours la carte en grand", ouvreEnGrand);
+  await C.keyboard.press("Escape");
+
+  /* « DOUCEMENT : ... » NE DOIT PAS RESTER AFFICHE. Le message restait jusqu'au
+     message suivant, longtemps apres etre devenu faux. */
+  await ouvrirRail(C);
+  await C.evaluate(async () => {
+    for (let i = 0; i < 5; i++) {
+      document.getElementById("chat-texte").value = "flot " + i;
+      document.getElementById("chat-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await new Promise((f) => setTimeout(f, 60));
+    }
+  });
+  await C.waitForFunction(() => (document.getElementById("chat-etat").textContent || "").trim().length > 0,
+    null, { timeout: 20000 }).catch(() => {});
+  const dit = await C.evaluate(() => (document.getElementById("chat-etat").textContent || "").trim());
+  t("un envoi trop rapide est signale", dit.length > 0, dit || "rien");
+  /* Le minuteur part du DERNIER refus, et les refus des messages mis en file
+     arrivent etales (le banc ajoute de la latence) : on laisse donc le temps
+     au dernier, au lieu de compter dix secondes depuis le premier. */
+  await C.waitForFunction(() => (document.getElementById("chat-etat").textContent || "").trim() === "",
+    null, { timeout: 30000 }).catch(() => {});
+  t("et le message d'etat s'efface tout seul",
+    (await C.evaluate(() => (document.getElementById("chat-etat").textContent || "").trim())) === "",
+    await C.evaluate(() => document.getElementById("chat-etat").textContent));
+
   await C.context().close();
 });
 
@@ -1528,6 +1604,15 @@ await bloc("Export", async () => {
       const m = document.getElementById("menu-affichage");
       return !!m && !!m.querySelector("#btn-export") && !!m.querySelector("#btn-export-svg");
     }));
+
+  /* UNE NOTE EN PLUSIEURS LIGNES, posee avant l'export. Les deux formats
+     coupaient le texte sur /\s+/ : une liste a puces ressortait sur une seule
+     ligne, dans le PNG comme dans le SVG. */
+  const NOTE = "Points a reprendre :\n- surveillance\n- emplois\n- energie";
+  R.appliquer(S, "jAnim", { op: "creerTexte", x: 240, y: 240, contenu: NOTE });
+  noter();
+  await A.waitForFunction(() => [...document.querySelectorAll(".c-texte")].some((e) => /surveillance/.test(e.textContent || "")),
+    null, { timeout: 15000 }).catch(() => {});
 
   // Un lien en pointille, pour verifier qu'il voyage jusqu'a l'export.
   await A.evaluate(() => {
@@ -1554,6 +1639,29 @@ await bloc("Export", async () => {
       (svg.match(/<image /g) || []).length + " images");
     t("les fleches y sont des traits, pas des pixels", /<path /.test(svg));
     t("et le pointille a suivi", /stroke-dasharray/.test(svg));
+
+    /* Le SVG echappe &apos; et &amp; : sans les redecoder, un titre contenant
+       une apostrophe passerait pour absent. */
+    const dexml = (x) => x.replace(/&apos;/g, "'").replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const textes = [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => dexml(m[1]));
+    /* LES RETOURS A LA LIGNE D'UNE NOTE DOIVENT RESTER DES LIGNES. */
+    t("une note en plusieurs lignes donne plusieurs lignes dans le SVG",
+      ["- surveillance", "- emplois", "- energie"].every((l) => textes.includes(l)),
+      textes.filter((x) => /surveillance|emplois|energie|reprendre/.test(x)).join(" / ") || "aucune");
+    /* LES INTITULES LONGS NE DOIVENT PLUS ETRE ROGNES : la decoupe mesurait
+       des caracteres au lieu de la police, et coupait a trois lignes. */
+    const cartes = JSON.parse(fs.readFileSync(path.join(RACINE, "site/data/cartes.json"), "utf8"));
+    const liste = Array.isArray(cartes) ? cartes : (cartes.cartes || []);
+    const longs = liste.filter((c) => +c.n >= 1).map((c) => String(c.titre || "")).filter((x) => x.length >= 34);
+    const joint = textes.join(" ").replace(/\s+/g, " ");
+    // L'intitule entier doit se retrouver, mot pour mot, dans les lignes du SVG.
+    const manquants = longs.filter((titre) => !joint.includes(titre.replace(/\s+/g, " ")));
+    t("les intitules longs ne sont pas rognes dans le SVG",
+      longs.length > 0 && manquants.length === 0,
+      longs.length ? "rognes : " + manquants.join(" | ") : "aucun intitule long : cas non couvert");
+    t("et rien n'est coupe par des points de suspension", !textes.some((x) => /\u2026$/.test(x)),
+      textes.filter((x) => /\u2026$/.test(x)).join(" | "));
     /* UN SVG QUI NE S'OUVRE PAS EST UN FICHIER MORT : on le rend vraiment. */
     const ctxS = await nav.newContext({ viewport: { width: 900, height: 600 } });
     const pgS = await ctxS.newPage();
