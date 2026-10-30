@@ -218,3 +218,15 @@ button.p-sujet:focus-visible { outline: 2px solid var(--accent, #E8811C); outlin
 }
 .apercu-fermer:hover { color: var(--accent-txt, #B0560A); border-color: var(--accent, #E8811C); }
 #apercu-cadre { display: block; width: 100%; height: 70vh; border: 0; background: #faf7f2; }
+
+/* Essayer le tableau : on dit d'abord QUELLE version on s'apprête à ouvrir,
+   parce que c'est exactement ce qui a manqué (on testait le site public en
+   croyant tester le changement). */
+.essai-ou{font-family:var(--f-ui);font-size:.85rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.6rem 0 .2rem}
+.essai-ou code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;
+  background:var(--doux,#faf8f4);border:1px solid var(--ligne,#e6e2da);border-radius:6px;padding:.1rem .4rem}
+.essai-etiquette{font-family:var(--f-ui);font-size:.68rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;border-radius:999px;padding:.12rem .5rem}
+.essai-etiquette.est-test{background:#E8811C;color:#1b1a17}
+.essai-etiquette.est-public{background:#2f7d4f;color:#fff}
+.essai-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.7rem 0 0}

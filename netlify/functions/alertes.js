@@ -35,7 +35,12 @@ const Com = require("../../serveur/src/communes.js");
 // L'adresse du site vient de lib/lien.js : celle du DEPLOIEMENT qui envoie,
 // pour qu'un courriel teste sur une preview y ramene au lieu de la production.
 const LIENS = require("./lib/lien.js");
-const LIEN = LIENS.SITE;
+/* Voir ateliers.js : l'adresse suit la demande, pour qu'un parcours lance
+   depuis un deploiement de test y revienne. Le jeton de confirmation est
+   range dans le magasin de CE deploiement ; un lien vers la production
+   tomberait sur un serveur qui ne le connait pas. */
+let LIEN = LIENS.SITE;
+function fixerLien(event) { LIEN = LIENS.pour(event); }
 
 const SEUIL = { limite: 10, fenetreMs: 60 * 60 * 1000 };
 
@@ -165,6 +170,7 @@ function mailMiseAJour(ab) {
 }
 
 exports.handler = async (event) => {
+  fixerLien(event);   // les liens de confirmation ramenent ici
   connectLambda(event);
   const s = store();
 

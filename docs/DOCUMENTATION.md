@@ -561,6 +561,28 @@ eux).
 
 ---
 
+## 10 bis. Relire un changement avant de le mettre en ligne
+
+Chaque proposition (pull request) est publiée par Netlify à une adresse à elle
+(`deploy-preview-NN--<site>.netlify.app`). Trois choses la rendent utilisable :
+
+- **Un bandeau le dit** (`assets/js/deploiement.js`, feuille chargée par le
+  script lui-même, donc jamais demandée en production) : sur une adresse
+  `*.netlify.app`, un bandeau fixe annonce « Version de test » et affiche
+  l'adresse exacte. Il ne porte **aucun lien vers la production** : sortir de
+  la version de test par mégarde est précisément ce qu'on évite. Refermable
+  pour la durée de l'onglet.
+- **Les liens des e-mails suivent le déploiement** (`netlify/functions/lib/lien.js`).
+  Ils partent de l'hôte de la REQUÊTE quand il est l'un des nôtres (liste
+  blanche : un en-tête `Host` se forge), sinon de l'environnement. Et un
+  déploiement de test est reconnu à son adresse même si `CONTEXT`, qui est une
+  variable de *build*, n'arrive pas jusqu'à l'exécution : sans cela, un atelier
+  créé depuis une preview renvoyait vers le site public.
+- **On entre sans inscription** : `/en-ligne/session/` ouvre une session
+  d'essai (un prénom, un clic), et le bouton « Inviter » donne un lien **sur la
+  même adresse**. `/admin/` porte un panneau « Essayer le tableau en direct »
+  qui dit quelle version est ouverte et y entre directement.
+
 ## 11. Fresque en ligne (tableau collaboratif)
 
 Un seul mode, **multi-participants** (`en-ligne/session/`, `session.js`,
