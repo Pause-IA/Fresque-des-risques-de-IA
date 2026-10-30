@@ -86,8 +86,8 @@ Qui reçoit quoi, exhaustivement (table de vérité vérifiée par
 Sont en plus écartés : les ateliers privés, passés, complets, ou à plus de
 60 jours.
 
-**Communes : liste fermée, et un rayon.** Les deux côtés — le formulaire
-d'abonnement (`/participer/#alertes`) et celui de programmation d'un atelier —
+**Communes : liste fermée, et un rayon.** Les deux côtés (le formulaire
+d'abonnement `/participer/#alertes` et celui de programmation d'un atelier)
 font choisir une commune dans les **34 875 communes françaises** (code INSEE,
 source : Code officiel géographique de l'INSEE). Aucune saisie libre n'est
 acceptée : « Lyon », « lyon » et « Lyon 7e » ne se rencontreraient jamais.
@@ -125,7 +125,7 @@ l'onglet. On y trouve :
 
 - les **contacts** (suivi, export CSV, désinscription et effacement RGPD) ;
 - les **retours et témoignages** déposés sur `/retour/` et `/temoignage/`.
-  Publier un témoignage l'affiche sur la page d'accueil — un test le vérifie,
+  Publier un témoignage l'affiche sur la page d'accueil : un test le vérifie,
   parce que cette chaîne a déjà été cassée une fois : le bouton marquait le
   témoignage sans rien changer à la page ;
 - les **alertes** : nombre d'abonnés et classement des communes en attente ;
@@ -149,7 +149,7 @@ variables d'environnement Netlify, jamais dans le dépôt (liste dans la doc).
 
 ## Signaler un bug
 
-Ouvrez une [issue GitHub](https://github.com/romain-deleglise/fresque-des-risques-de-ia/issues)
+Ouvrez une [issue GitHub](https://github.com/Pause-IA/Fresque-des-risques-de-IA/issues)
 ou écrivez à [contact@pauseia.fr](mailto:contact@pauseia.fr).
 
 ## Licences
